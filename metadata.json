@@ -1,0 +1,6 @@
+{
+  "name": "SplitWise AI - Split-Screen Bill Splitter",
+  "description": "AI-powered split-screen receipt scanner and smart conversational bill splitting assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

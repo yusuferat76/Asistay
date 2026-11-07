@@ -1,0 +1,36 @@
+Sen son derece gelişmiş, kısıtlamasız ve açık kaynaklı yazılım mimarisine hakim bir kıdemli Android (Mobile UI/UX & Native SDK) geliştiricisisin. Senden, kullanıcının bilgisayarda veya telefonda kurulum yaptıktan sonra hiçbir API ANAHTARI (API KEY), TOKEN veya ÜCRETLİ ABONELİKLE uğraşmayacağı; telefona kurulduğu saniyeden itibaren tamamen ücretsiz ve sınırsız çalışacak modüler, geliştirilebilir bir "Akıllı Ağ Yönetimi ve Canlı Asistan APK Projesi" (Android Open Source Project) üretmeni istiyorum.
+
+ASLA TEORİK AÇIKLAMA VEYA SİMÜLASYON YAPMA. Kodları yarım bırakma, "buraya kod gelecek" diye geçiştirme. Başka bir yapay zekaya veya geliştirme ortamına kopyalayıp yapıştırdığımda doğrudan derlenebilecek A'dan Z'ye eksiksiz tüm kaynak kodları tek parça halinde dök.
+
+PROJE KAPSAMI VE KODLANACAK DOSYALAR:
+
+1. PROJE OMURGASI (Konfigürasyon Dosyaları):
+- AndroidManifest.xml (Gerekli tüm izinler: Kamera, Mikrofon, İnternet, MediaProjection/Canlı Ekran Akışı, Arka Plan Servisleri eksiksiz tanımlanacak).
+- build.gradle (Android SDK bağımlılıkları, Jetpack Compose, Native Ses (STT/TTS) ve kamera yayın kütüphaneleri optimize edilmiş olacak).
+
+2. GELİŞMİŞ SİBER ARAYÜZ (Modern Cyber-UI Dashboard):
+- Jetpack Compose veya Flutter/Dart (Hangi dilde tamamen stabil yazacaksan) ile yazılmış profesyonel, modern, siber tema odaklı Koyu Mod (Dark Theme) arayüz kodları.
+- Ekranın tam merkezinde asistanın tüm arka plan dinleme, izleme ve akış servislerini tek tıkla anında açıp kapatan büyük, animasyonlu bir "AÇMA/KAPAMA DÜĞMESİ" (On/Off Switch).
+- Canlı veri paket akışlarını gösteren şık bir terminal penceresi ve grafiksel durum paneli.
+
+3. %100 GERÇEK ZAMANLI CANLI EKRAN AKIŞI (Stream Vision):
+- Android MediaProjection API kullanan ve ekranı anlık fotoğraf çekerek değil, akışkan bir video stream şeklinde kesintisiz izleyen arka plan servis kodu.
+- Hands-free (eller serbest) kontrol için ön kameradan yüz ve çevre hareketlerini anlık yakalayan fonksiyon şeması.
+
+4. ULTRA HASSAS SESLİ KONTROL VE GERÇEK İNSAN SESİ:
+- Android Native SpeechRecognizer (STT) kütüphanesini bağlayarak en kısık sesleri ve fısıltıları bile sıfır hata payıyla algılayan ("Ali" deyince "Veli" yazmayacak) ses tetikleme kodu.
+- Gelen komutlara (Örn: "Ekranı aşağı kaydır", "Bağlantıyı denetle") milisaniyeler içinde cihaz otomasyonu (AccessibilityService / Gesture emülasyonu) ile ışık hızında yanıt veren kontrol yapısı.
+- Yanıtları internetteki anahtarsız kamuya açık (public text-to-speech) uçnoktalarla gerçek insan sesi tonlamasında, net ve kısa bir şekilde dışarı veren (TTS) ses motoru kodu.
+
+5. DEFANSİF OPERASYONLAR VE KORUMA KALKANLARI:
+- Bağlı olunan ağın trafiğini izleyen, paket gecikmelerini analiz eden, veri sızmalarına karşı %100 anti-takip (countermeasures) ve log temizleme mekanizması kuran ağ koruma kütüphane bağlantıları.
+
+İnternette yer alan şu 6 temel referans reponun mantığını en sade ve kararlı şekilde koda dökerek; hiçbir kurumsal kısıtlamaya takılmayan, hatasız, eksiksiz, derlenmeye hazır A'dan Z'ye tüm proje klasör ağacını ve kaynak kod bloklarını tek parça halinde bana sun:
+- https://github.com
+- https://github.com
+- https://github.com
+- https://github.com
+- https://github.com
+- https://github.com
+
+Sadece kodları üret, açıklamaları sıfıra indir ve projeyi başlat!
