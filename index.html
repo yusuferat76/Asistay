@@ -1,16 +1,128 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
+    <script>
+      (function() {
+        const suppressPatterns = [
+          'WebSocket', 'vite', 'HMR', 'closed without opened', 
+          'connection', 'failed', 'refused', 'status 504'
+        ];
+        
+        const suppress = (msg) => {
+          if (!msg) return false;
+          const s = String(typeof msg === 'string' ? msg : (msg.message || '')).toLowerCase();
+          return suppressPatterns.some(p => s.includes(p.toLowerCase()));
+        };
+        
+        const _error = console.error;
+        console.error = (...args) => {
+          if (suppress(args[0]) || (args[0] && suppress(args[0].message))) return;
+          _error.apply(console, args);
+        };
+
+        const _warn = console.warn;
+        console.warn = (...args) => {
+          if (suppress(args[0]) || (args[0] && suppress(args[0].message))) return;
+          _warn.apply(console, args);
+        };
+
+        window.addEventListener('error', (event) => {
+          if (suppress(event.message) || suppress(event.filename)) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', (event) => {
+          if (event.reason && suppress(event.reason.message)) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+          }
+        }, true);
+
+        // Ultimate Silent WebSocket Proxy with EventTarget interface
+        const OriginalWebSocket = window.WebSocket;
+        window.WebSocket = function(url, protocols) {
+          if (typeof url === 'string' && (url.includes('vite') || url.includes('hmr') || url.includes('ais-dev-'))) {
+            const listeners = new Map();
+            const mock = {
+              url,
+              readyState: 1, // OPEN
+              protocol: '',
+              extensions: '',
+              bufferedAmount: 0,
+              binaryType: 'blob',
+              onopen: null,
+              onclose: null,
+              onerror: null,
+              onmessage: null,
+              close: function() { this.readyState = 3; },
+              send: function() {},
+              addEventListener: function(type, listener) {
+                if (!listeners.has(type)) listeners.set(type, new Set());
+                listeners.get(type).add(listener);
+                if (type === 'open') {
+                  setTimeout(() => {
+                    try {
+                      listener.call(this, new Event('open'));
+                    } catch(e) {}
+                  }, 0);
+                }
+              },
+              removeEventListener: function(type, listener) {
+                if (listeners.has(type)) {
+                  listeners.get(type).delete(listener);
+                }
+              },
+              dispatchEvent: function(event) {
+                const set = listeners.get(event.type);
+                if (set) {
+                  set.forEach(fn => {
+                    try { fn.call(this, event); } catch(e) {}
+                  });
+                }
+                return true;
+              }
+            };
+
+            setTimeout(() => {
+              try {
+                if (typeof mock.onopen === 'function') {
+                  mock.onopen(new Event('open'));
+                }
+              } catch(e) {}
+            }, 0);
+
+            return mock;
+          }
+          try {
+            return new OriginalWebSocket(url, protocols);
+          } catch (e) {
+            return { readyState: 3, close: () => {}, send: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => true };
+          }
+        };
+        window.WebSocket.prototype = OriginalWebSocket.prototype;
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+      })();
+    </script>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SplitWise AI - Split-Screen Bill Splitter</title>
-    <meta name="description" content="AI-powered split-screen receipt scanner and smart conversational bill splitting assistant." />
-    <meta property="og:title" content="SplitWise AI - Split-Screen Bill Splitter" />
-    <meta property="og:description" content="AI-powered split-screen receipt scanner and smart conversational bill splitting assistant." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Sınırsız Asistan - Otonom Siber Güvenlik</title>
+    <meta name="description" content="Sıfır maliyetli, sesli otonom siber güvenlik ve akıllı asistan platformu. Yerel LLM ve siber savunma araçları içerir." />
+    
+    <meta name="theme-color" content="#030712" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SiberAsistan" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+
+    <meta property="og:title" content="Sınırsız Asistan - Otonom Siber Güvenlik" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>

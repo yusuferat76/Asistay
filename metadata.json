@@ -1,6 +1,8 @@
 {
-  "name": "SplitWise AI - Split-Screen Bill Splitter",
-  "description": "AI-powered split-screen receipt scanner and smart conversational bill splitting assistant.",
+  "name": "Sınırsız Asistan - Otonom Siber Güvenlik",
+  "description": "Sıfır maliyetli, sesli otonom siber güvenlik ve akıllı asistan platformu. Yerel LLM ve siber savunma araçları içerir.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

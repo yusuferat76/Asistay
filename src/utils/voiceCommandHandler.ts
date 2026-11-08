@@ -14,7 +14,8 @@ export interface VoiceCommandResult {
     | 'SCROLL_TOP'
     | 'SCROLL_BOTTOM'
     | 'CLOSE_MODAL'
-    | 'LIGHTSPEED_MODE';
+    | 'LIGHTSPEED_MODE'
+    | 'DEBT_SUMMARY';
   target?: string;
   feedbackText?: string;
 }
@@ -25,7 +26,7 @@ export interface VoiceCommandResult {
 export function parseTurkishVoiceCommand(transcript: string): VoiceCommandResult {
   const text = transcript.toLowerCase().trim();
 
-  // 0. Işık Hızı / Ultra Hız Kontrolü
+  // 0. Işık Hızı / Ultra Hız Kontrolü & Anlık Selamlama
   if (
     text.includes('ışık hızı') ||
     text.includes('isik hizi') ||
@@ -37,6 +38,44 @@ export function parseTurkishVoiceCommand(transcript: string): VoiceCommandResult
       isCommand: true,
       action: 'LIGHTSPEED_MODE',
       feedbackText: 'Işık hızında işlem çekirdeği aktif. Tüm komutlar saliselik olarak anında icra ediliyor.',
+    };
+  }
+
+  if (
+    text.includes('selam') ||
+    text.includes('merhaba') ||
+    text.includes('hey') ||
+    text === 'selam ver'
+  ) {
+    return {
+      isCommand: true,
+      action: 'LIGHTSPEED_MODE',
+      feedbackText: 'Aleykümselam Komutan. Sınırsız Asistan emrinizde, tüm sistemler ışık hızında aktif.',
+    };
+  }
+
+  if (
+    text.includes('nasılsın') ||
+    text.includes('durum ne')
+  ) {
+    return {
+      isCommand: true,
+      action: 'LIGHTSPEED_MODE',
+      feedbackText: 'Sistemler %100 kapasiteyle, sıfır gecikmeyle ve güvenle çalışıyor.',
+    };
+  }
+
+  if (
+    text.includes('borç durumumu özetle') ||
+    text.includes('borçlarımı özetle') ||
+    text.includes('borç durumum') ||
+    text.includes('hesap özeti') ||
+    text.includes('kim ne kadar ödeyecek')
+  ) {
+    return {
+      isCommand: true,
+      action: 'DEBT_SUMMARY',
+      feedbackText: 'Borç durumu ve kişi bazlı ödeme yükümlülükleri analiz ediliyor...',
     };
   }
 

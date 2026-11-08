@@ -1,0 +1,47 @@
+﻿Türkçe sesli komutlarla bilgisayarınızı tamamen ücretsiz ve A'dan Z'ye kontrol edecek yapay zeka sistemini en baştan, adım adım kuruyoruz.
+Bu sistemde gizli bir ücret, abonelik veya bulut ücreti yoktur. Yapay zeka tamamen sizin bilgisayarınızın gücüyle çalışacaktır.
+Sürecin büyük resmini ve atacağımız adımları aşağıda sırasıyla görebilirsiniz:
+________________
+🗺️ Genel Plan: Ne Yapacağız?
+Sistemi 3 ana parçayı birleştirerek kuracağız:
+1. Akıl (Ollama): Yapay zekanın beynini bilgisayarınıza ücretsiz indireceğiz.
+2. Eller ve Gözler (Open Interpreter): Yapay zekanın ekranınızı görmesini, farenizi ve klavyenizi hareket ettirmesini sağlayacağız.
+3. Kulaklar (Windows/Mac Yerleşik Dikte): Sizin Türkçe konuşmalarınızı yapay zekaya aktaran ücretsiz ses motorunu kullanacağız.
+________________
+🛠️ 1. BÖLÜM: Bilgisayarı Hazırlama (Ön Kurulumlar)
+Yapay zekanın bilgisayarınızda çalışabilmesi için iki temel ücretsiz altyapıya ihtiyacımız var.
+* Adım 1 (Python Kurulumu):
+   * python.org adresine gidin ve bilgisayarınız için en güncel sürümü indirin.
+   * Yükleme ekranı açıldığında, en altta bulunan "Add Python to PATH" (Python'ı PATH'e ekle) kutucuğunu mutlaka işaretleyin. (Bu kutuyu kaçırırsanız sistem çalışmaz). Kurulumu tamamlayın.
+* Adım 2 (Ollama Kurulumu):
+   * ollama.com adresine girip "Download" butonuna basın ve kurun. Bu program yapay zekayı bilgisayarınızda ücretsiz çalıştıracak motordur.
+________________
+🧠 2. BÖLÜM: Türkçe Yapay Zeka Beynini İndirme
+Şimdi bilgisayarımızın komut satırını açarak yapay zekanın Türkçe bilen beynini bilgisayarımıza yükleyeceğiz.
+* Adım 3 (Terminali Açma):
+   * Windows kullanıyorsanız: Başlat menüsüne cmd yazıp Komut İstemi'ni açın.
+   * Mac kullanıyorsanız: Finder > Uygulamalar > İzlenceler yolundan Terminal uygulamasını açın.
+* Adım 4 (Modeli İndirme): Açılan siyah ekrana tam olarak şu komutu yazın ve Enter'a basın:
+ollama run qwen2.5:7b
+Bu işlem bilgisayarınızın internet hızına bağlı olarak 5-10 dakika sürebilir. Ekrandaki yükleme barı %100 olduğunda yapay zeka beyni bilgisayarınıza inmiş demektir.
+________________
+🕹️ 3. BÖLÜM: Yapay Zekaya Bilgisayarı Kontrol Yetkisi Verme
+Şimdi yapay zekaya farenizi oynatma, klasör açma ve ekranı okuma yeteneği veren ana programı yükleyip çalıştıracağız.
+   * Adım 5 (Open Interpreter Yükleme): Aynı siyah komut ekranına şu komutu yazıp Enter'a basın:
+pip install open-interpreter
+
+   * Adım 6 (Sistemi Başlatma): Her şey yüklendikten sonra, yapay zekayı bilgisayarı tamamen Türkçe yönetecek şekilde çalıştırmak için şu komutu yazın ve Enter'a basın:
+interpreter --local --model qwen2.5:7b --os
+(Sistem ilk açılışta ekranı görebilmek için sizden onay veya erişilebilirlik izni isteyebilir, ekrandaki uyarılara onay verin.)
+________________
+🗣️ 4. BÖLÜM: Tamamen Türkçe Sesle Yönetim
+Artık yapay zeka sizi dinlemeye hazır bir şekilde terminal ekranında bekliyor. Klavyeyi ve fareyi bırakın.
+      * Adım 7 (Mikrofonu Açma):
+      * Windows'ta: Klavyeden Windows Logosu + H tuşlarına basın. Ekranın üstünde küçük bir mikrofon simgesi belirecektir.
+      * Mac'te: Fn tuşuna iki kez basın (Dikte özelliğini açar).
+      * Adım 8 (Komut Verme): Mikrofona tamamen Türkçe ve doğal bir şekilde isteğinizi söyleyin. Örneğin:
+      * "Masaüstünde 'Yapay Zeka' adında bir klasör aç, içine gir ve 'not.txt' adında bir dosya oluştur."
+      * "Chrome tarayıcısını aç ve bana bugünün hava durumunu göster."
+Siz konuşmayı bitirdiğinizde söyledikleriniz yazıya dökülecek, yapay zeka bu Türkçe komutu anlayacak ve farenizi/klavyenizi gözünüzün önünde hareket ettirerek işlemi yapacaktır.
+________________
+Şu anda bu adımlardan hangisindesiniz? Eğer hazırsanız, 1. Bölümdeki Python ve Ollama indirme işlemlerini başlatın ve takıldığınız yerde bana yazın, adım adım birlikte ilerleyelim!

@@ -151,7 +151,7 @@ export const CyberVoiceAssistant: React.FC<CyberVoiceAssistantProps> = ({
     synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'tr-TR';
-    utterance.rate = 1.15;
+    utterance.rate = 1.25;
     utterance.pitch = 1.0;
 
     // Pick Turkish voice if available
@@ -363,9 +363,9 @@ export const CyberVoiceAssistant: React.FC<CyberVoiceAssistantProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#030712] text-white overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-black text-white overflow-hidden">
       {/* Top Cyber Status Bar */}
-      <div className="bg-[#070d1e] border-b border-blue-900/40 px-4 py-2.5 flex items-center justify-between text-xs shrink-0">
+      <div className="bg-[#050505] border-b border-blue-900/40 px-4 py-2.5 flex items-center justify-between text-xs shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">

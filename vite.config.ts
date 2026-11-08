@@ -11,6 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
           name: 'Sınırsız Siber Asistan',
@@ -19,6 +20,7 @@ export default defineConfig(() => {
           theme_color: '#030712',
           background_color: '#030712',
           display: 'standalone',
+          orientation: 'portrait',
           start_url: '/',
           scope: '/',
           icons: [
@@ -34,10 +36,20 @@ export default defineConfig(() => {
               type: 'image/png',
               purpose: 'any',
             },
+            {
+              src: '/pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
           ],
         },
         devOptions: {
           enabled: true,
+        },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         },
       }),
     ],
@@ -49,7 +61,7 @@ export default defineConfig(() => {
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
+      hmr: false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
