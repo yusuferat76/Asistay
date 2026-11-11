@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { playTacticalSound } from '../utils/audioEffects';
 import { parseTurkishVoiceCommand } from '../utils/voiceCommandHandler';
+import { getGlobalMute, setGlobalMute, stopUltraSpeech } from '../utils/ultraTTS';
 
 interface CyberVoiceAssistantProps {
   onSelectTab?: (tab: 'assistant' | 'tools' | 'personal') => void;
@@ -69,7 +70,7 @@ export const CyberVoiceAssistant: React.FC<CyberVoiceAssistantProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(getGlobalMute());
   const [speechSupported, setSpeechSupported] = useState(true);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     '[SYSTEM_BOOT] Çekirdek v4.2 başlatıldı.',
@@ -146,7 +147,14 @@ export const CyberVoiceAssistant: React.FC<CyberVoiceAssistantProps> = ({
 
   // Speak response in Turkish
   const speakText = (text: string) => {
-    if (isMuted || !synthRef.current) return;
+    if (isMuted || getGlobalMute() || !synthRef.current) {
+      if (synthRef.current) {
+        try {
+          synthRef.current.cancel();
+        } catch (e) {}
+      }
+      return;
+    }
 
     synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -400,7 +408,12 @@ export const CyberVoiceAssistant: React.FC<CyberVoiceAssistantProps> = ({
           )}
 
           <button
-            onClick={() => setIsMuted(!isMuted)}
+            onClick={() => {
+              const next = !isMuted;
+              setIsMuted(next);
+              setGlobalMute(next);
+              if (next) stopUltraSpeech();
+            }}
             className={`p-1.5 rounded-lg border transition ${
               isMuted
                 ? 'bg-rose-950/50 border-rose-800 text-rose-400'

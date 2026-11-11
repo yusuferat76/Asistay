@@ -15,6 +15,14 @@ export interface AgentTelemetry {
   threatsDetected: number;
 }
 
+export interface EncryptionStreamTelemetry {
+  streamId: string;
+  algorithm: string;
+  integrity: number; // e.g., 99.99
+  latencyMs: number;
+  status: 'secure' | 'rekeying' | 'quantum-locked';
+}
+
 export interface AgentReport {
   id: string;
   agentName: string;
@@ -153,6 +161,19 @@ class AutonomousAgentManager {
   private reportListeners: ReportCallback[] = [];
   private telemetryListeners: TelemetryCallback[] = [];
   private intervals: any[] = [];
+  private encryptionStreams: EncryptionStreamTelemetry[] = [
+    { streamId: 'q-stream-01', algorithm: 'ML-KEM-1024 (Post-Quantum)', integrity: 99.99, latencyMs: 1.2, status: 'quantum-locked' },
+    { streamId: 'q-stream-02', algorithm: 'AES-256-GCM Hardware Vault', integrity: 100.00, latencyMs: 0.8, status: 'secure' },
+    { streamId: 'q-stream-03', algorithm: 'Zero-Trust Micro-Segment', integrity: 99.95, latencyMs: 2.1, status: 'secure' }
+  ];
+
+  public getEncryptionStreams(): EncryptionStreamTelemetry[] {
+    // slight random fluctuation for realism
+    return this.encryptionStreams.map(s => ({
+      ...s,
+      integrity: Number((99.90 + Math.random() * 0.10).toFixed(2))
+    }));
+  }
 
   public start() {
     this.intervals.push(setInterval(() => this.runSentinelX(), 8000));

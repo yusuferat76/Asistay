@@ -4,8 +4,39 @@
  * with optimized pitch, rate, and intonation for maximum human resemblance.
  */
 
+// Global Mute State: Defaulted to true (silenced/muted) per user request
+let globalMuted = true;
+
+// Cancel any active speech synthesis immediately on load
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  try {
+    window.speechSynthesis.cancel();
+  } catch (e) {
+    // Ignore
+  }
+}
+
+export function setGlobalMute(muted: boolean): void {
+  globalMuted = muted;
+  if (muted && typeof window !== 'undefined' && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
+  }
+}
+
+export function getGlobalMute(): boolean {
+  return globalMuted;
+}
+
 export function speakUltraRealistic(text: string, onEnd?: () => void): void {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
+  // If muted, completely suppress speech and cancel any pending queue
+  if (globalMuted || typeof window === 'undefined' || !window.speechSynthesis) {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
     if (onEnd) onEnd();
     return;
   }
@@ -20,7 +51,7 @@ export function speakUltraRealistic(text: string, onEnd?: () => void): void {
   utterance.volume = 1.0;
 
   const voices = window.speechSynthesis.getVoices();
-  // Find the best Turkish voice (优先 Google Türkçe, Microsoft natural, or any tr-TR)
+  // Find the best Turkish voice (Google Türkçe, Microsoft natural, or any tr-TR)
   const bestVoice =
     voices.find((v) => v.lang === 'tr-TR' && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Online'))) ||
     voices.find((v) => v.lang === 'tr-TR' || v.lang.startsWith('tr')) ||
@@ -44,6 +75,8 @@ export function speakUltraRealistic(text: string, onEnd?: () => void): void {
 
 export function stopUltraSpeech(): void {
   if (typeof window !== 'undefined' && window.speechSynthesis) {
-    window.speechSynthesis.cancel();
+    try {
+      window.speechSynthesis.cancel();
+    } catch (e) {}
   }
 }

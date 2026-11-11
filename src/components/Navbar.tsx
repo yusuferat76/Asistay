@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Shield,
   Mic,
@@ -11,7 +11,10 @@ import {
   Trash2,
   Lock,
   Sliders,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
+import { getGlobalMute, setGlobalMute, stopUltraSpeech } from '../utils/ultraTTS';
 
 interface NavbarProps {
   currentTab: 'assistant' | 'tools' | 'personal' | 'phone-tracker' | 'architecture' | 'tactical-inventory';
@@ -34,6 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSanitizer,
   onOpenLock,
 }) => {
+  const [isMuted, setIsMuted] = useState(getGlobalMute());
+
   return (
     <header className="h-16 bg-black border-b border-blue-900/40 px-3 sm:px-5 flex items-center justify-between shrink-0 z-30 select-none">
       {/* Brand */}
@@ -141,6 +146,34 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right Action Icons */}
       <div className="flex items-center gap-2">
+        {/* Global Sound Mute / Silence Toggle */}
+        <button
+          onClick={() => {
+            const next = !isMuted;
+            setIsMuted(next);
+            setGlobalMute(next);
+            if (next) stopUltraSpeech();
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition ${
+            isMuted
+              ? 'bg-red-950/80 border-red-700/80 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.35)]'
+              : 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300 hover:text-white'
+          }`}
+          title={isMuted ? 'Ses Tamamen Kapalı (Sessizde) - Tıklayarak Sesi Açın' : 'Ses Açık - Tıklayarak Sessize Alın'}
+        >
+          {isMuted ? (
+            <>
+              <VolumeX className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-mono font-bold tracking-wider">SESSİZ</span>
+            </>
+          ) : (
+            <>
+              <Volume2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-mono font-bold tracking-wider">SES AÇIK</span>
+            </>
+          )}
+        </button>
+
         {/* Wake-on-Voice Lock Button */}
         {onOpenLock && (
           <button

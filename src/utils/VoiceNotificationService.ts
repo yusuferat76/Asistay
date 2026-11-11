@@ -1,6 +1,7 @@
 import { agentManager, AgentReport } from './AgentManager';
-import { speakUltraRealistic } from './ultraTTS';
+import { speakUltraRealistic, getGlobalMute } from './ultraTTS';
 import { playTacticalSound } from './audioEffects';
+import { triggerHaptic } from './haptics';
 
 /**
  * Voice Notification Service
@@ -22,9 +23,15 @@ class VoiceNotificationService {
 
   private processReport(report: AgentReport) {
     if (report.type === 'critical') {
+      triggerHaptic('critical');
+    } else if (report.type === 'warning') {
+      triggerHaptic('warning');
+    }
+
+    if (getGlobalMute()) return;
+    if (report.type === 'critical') {
       this.triggerCriticalVoiceAlert(report);
     } else if (report.type === 'warning') {
-      // Optional: Handle warnings with a simpler sound or lower priority
       playTacticalSound('ai_response');
     }
   }

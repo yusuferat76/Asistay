@@ -1,8 +1,33 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
-import { feature } from 'topojson-client';
-import { Globe, Filter, AlertTriangle, Shield, Zap, X, Radio, RefreshCw, Eye, Flame, Activity, Layers } from 'lucide-react';
+import {
+  Globe,
+  Filter,
+  AlertTriangle,
+  Shield,
+  Zap,
+  X,
+  Radio,
+  RefreshCw,
+  Flame,
+  Activity,
+  Layers,
+  Cpu,
+  Bot,
+  Radar,
+  ArrowRight,
+  ShieldAlert,
+  Sliders
+} from 'lucide-react';
 import { RadialMacroMenu } from './RadialMacroMenu';
+import { AgentTelemetry, agentManager, DEFENSE_MACROS } from '../utils/AgentManager';
+
+export interface GlobeAlert {
+  id: string;
+  title: string;
+  message: string;
+  severity: 'red' | 'yellow' | 'green';
+}
 
 export interface CyberThreatPoint {
   id: string;
@@ -15,6 +40,38 @@ export interface CyberThreatPoint {
   method: string;
   affectedComponent: string;
   timestamp: string;
+}
+
+export interface AgentRiskArea {
+  id: string;
+  name: string;
+  coords: [number, number]; // [lng, lat]
+  agentId: 'sentinel-x' | 'guardian-v' | 'ghost-s';
+  agentName: string;
+  category: string;
+  threatVector: string;
+  baseRiskScore: number; // 0 to 100
+  radiusDeg: number; // Geodesic circle radius in degrees on the sphere
+  severity: 'red' | 'yellow' | 'green';
+  targetAsset: string;
+  recommendedMacro: string;
+  macroCodeName: string;
+  details: string;
+  detectedTime: string;
+  livePacketCount: string;
+  pulseSpeed: number;
+}
+
+export interface TacticalTrafficCluster {
+  id: string;
+  name: string;
+  coords: [number, number]; // [lng, lat]
+  baseIntensity: number; // 0.0 to 1.0
+  baseRadius: number;
+  throughput: string;
+  packetRate: string;
+  threatLevel: 'Low' | 'Elevated' | 'High' | 'Critical';
+  phase: number;
 }
 
 const SAMPLE_THREATS: CyberThreatPoint[] = [
@@ -80,17 +137,198 @@ const SAMPLE_THREATS: CyberThreatPoint[] = [
   },
 ];
 
-export interface TacticalTrafficCluster {
-  id: string;
-  name: string;
-  coords: [number, number]; // [lng, lat]
-  baseIntensity: number; // 0.0 to 1.0 (gradient scale from parliament-blue to danger-red)
-  baseRadius: number;
-  throughput: string;
-  packetRate: string;
-  threatLevel: 'Low' | 'Elevated' | 'High' | 'Critical';
-  phase: number;
-}
+export const INITIAL_AGENT_RISK_AREAS: AgentRiskArea[] = [
+  {
+    id: 'ara-1',
+    name: 'Frankfurt DE-CIX Omurgası',
+    coords: [8.6821, 50.1109],
+    agentId: 'sentinel-x',
+    agentName: 'Sentinel-X',
+    category: 'Perimeter Ağ İhlali',
+    threatVector: 'SS7 & Diameter Omurga Sinyal Müdahalesi',
+    baseRiskScore: 96,
+    radiusDeg: 9,
+    severity: 'red',
+    targetAsset: 'GSM Şebekesi & SMS 2FA Geçitleri',
+    recommendedMacro: 'Kill Network Process',
+    macroCodeName: 'SIGKILL_ROGUE_SOCKET',
+    details: 'Sentinel-X otonom paketi, DE-CIX omurgasında yetkisiz dış soket ve baz istasyonu sorgulamaları yakaladı.',
+    detectedTime: '1 dk önce',
+    livePacketCount: '8.4M pps (Anormal)',
+    pulseSpeed: 1.8,
+  },
+  {
+    id: 'ara-2',
+    name: 'Washington D.C. Bulut Kasası',
+    coords: [-77.0369, 38.9072],
+    agentId: 'guardian-v',
+    agentName: 'Guardian-V',
+    category: 'Kernel & Sistem Bütünlüğü',
+    threatVector: 'Linux Kernel 6.8 Heap Overflow & Rootkit',
+    baseRiskScore: 94,
+    radiusDeg: 10,
+    severity: 'red',
+    targetAsset: 'Federal Savunma & Şifreli Veri Kasası',
+    recommendedMacro: 'Encrypt Current Buffer',
+    macroCodeName: 'RAM_VAULT_AES256',
+    details: 'Guardian-V derin bellek tarayıcısı, çekirdek seviyesinde yetkisiz bir tampon aşımı denemesi teyit etti.',
+    detectedTime: '3 dk önce',
+    livePacketCount: '34.8 Gbps Dump',
+    pulseSpeed: 2.1,
+  },
+  {
+    id: 'ara-3',
+    name: 'Istanbul DoH & Omurga Geçidi',
+    coords: [28.9784, 41.0082],
+    agentId: 'sentinel-x',
+    agentName: 'Sentinel-X',
+    category: 'Ağ Maskeleme & DoH Sızıntısı',
+    threatVector: 'Şüpheli IP Port Taraması & Rogue DNS',
+    baseRiskScore: 89,
+    radiusDeg: 8.5,
+    severity: 'red',
+    targetAsset: 'Ulusal Telekomünikasyon DNS Omurgası',
+    recommendedMacro: 'Isolate Subnet',
+    macroCodeName: 'ZERO_TRUST_SEGMENT',
+    details: 'Ağ perimetresi üzerinde yetkisiz dış porta doğru yoğun SYN taraması saptandı ve bloklandı.',
+    detectedTime: '4 dk önce',
+    livePacketCount: '5.2M pps',
+    pulseSpeed: 1.6,
+  },
+  {
+    id: 'ara-4',
+    name: 'Beijing CIX Telekom Düğümü',
+    coords: [116.4074, 39.9042],
+    agentId: 'ghost-s',
+    agentName: 'Ghost-S',
+    category: 'DDoS & Botnet Komuta',
+    threatVector: '1.2 Tbps Otonom Botnet SYN Flood',
+    baseRiskScore: 92,
+    radiusDeg: 11,
+    severity: 'red',
+    targetAsset: 'Asya Omurga Yönlendiricileri & C2',
+    recommendedMacro: 'Rotate VPN / Tor Hop',
+    macroCodeName: 'ONION_CIRCUIT_HOP',
+    details: 'Ghost-S istihbarat motoru, botnet komuta merkezine bağlanan 420.000 aktif zombi cihaz saptadı.',
+    detectedTime: '6 dk önce',
+    livePacketCount: '1.2 Tbps Flood',
+    pulseSpeed: 2.0,
+  },
+  {
+    id: 'ara-5',
+    name: 'Moscow MSK-IX Darknet Havuzu',
+    coords: [37.6173, 55.7558],
+    agentId: 'ghost-s',
+    agentName: 'Ghost-S',
+    category: 'Darknet Veri Sızıntısı',
+    threatVector: 'Double Extortion Fidye Yazılımı Veri Sızdırma',
+    baseRiskScore: 85,
+    radiusDeg: 9.5,
+    severity: 'yellow',
+    targetAsset: 'Kurumsal Finansal Veritabanları',
+    recommendedMacro: 'Scrub Fingerprint',
+    macroCodeName: 'SYNTHETIC_MASKING',
+    details: 'Dark web forumlarında son 24 saatte sızdırılan kimlik ve token veritabanı eşleşti.',
+    detectedTime: '8 dk önce',
+    livePacketCount: '12.4 Gbps Exfiltration',
+    pulseSpeed: 1.4,
+  },
+  {
+    id: 'ara-6',
+    name: 'London Finansal Veri Merkezi',
+    coords: [-0.1276, 51.5074],
+    agentId: 'guardian-v',
+    agentName: 'Guardian-V',
+    category: 'Bellek Enjeksiyonu',
+    threatVector: 'Ransomware DLL Yan Yükleme & C2 Sinyali',
+    baseRiskScore: 81,
+    radiusDeg: 8,
+    severity: 'yellow',
+    targetAsset: 'Bankacılık Küme Sunucusu (SWIFT Düğümü)',
+    recommendedMacro: 'Quarantine Payloads',
+    macroCodeName: 'HEURISTIC_JAIL',
+    details: 'İmzasız DLL kitaplığı belleğe yüklenmeye çalışırken Guardian-V tarafından askıya alındı.',
+    detectedTime: '11 dk önce',
+    livePacketCount: '1.8M pps',
+    pulseSpeed: 1.3,
+  },
+  {
+    id: 'ara-7',
+    name: 'Tokyo AP-East Edge Relay',
+    coords: [139.6917, 35.6895],
+    agentId: 'sentinel-x',
+    agentName: 'Sentinel-X',
+    category: 'DNS Tünelleme',
+    threatVector: 'Anormal DNS TXT Kayıt Sorgusu & Beaconing',
+    baseRiskScore: 74,
+    radiusDeg: 7.5,
+    severity: 'yellow',
+    targetAsset: 'AWS Cloud Edge Gateway',
+    recommendedMacro: 'Kill Network Process',
+    macroCodeName: 'SIGKILL_ROGUE_SOCKET',
+    details: 'Şüpheli DNS TXT kayıtları üzerinden gizli veri tüneli saptandı.',
+    detectedTime: '14 dk önce',
+    livePacketCount: '920K pps',
+    pulseSpeed: 1.2,
+  },
+  {
+    id: 'ara-8',
+    name: 'Sao Paulo IX.br Cloud Hub',
+    coords: [-46.6333, -23.5505],
+    agentId: 'guardian-v',
+    agentName: 'Guardian-V',
+    category: 'Yetkisiz Dosya Erişimi',
+    threatVector: 'Yetkisiz /etc/shadow ve Rootkit Değişikliği',
+    baseRiskScore: 68,
+    radiusDeg: 7,
+    severity: 'yellow',
+    targetAsset: 'Güney Amerika Veri Merkezi',
+    recommendedMacro: 'Quarantine Payloads',
+    macroCodeName: 'HEURISTIC_JAIL',
+    details: 'Guardian-V bütünlük tarayıcısı, çekirdek modülü erişim girişimini engelledi.',
+    detectedTime: '18 dk önce',
+    livePacketCount: '650K pps',
+    pulseSpeed: 1.1,
+  },
+  {
+    id: 'ara-9',
+    name: 'Singapore SGIX Denizaltı İniş Noktası',
+    coords: [103.8198, 1.3521],
+    agentId: 'ghost-s',
+    agentName: 'Ghost-S',
+    category: 'Taktiksel Ağ Geçidi',
+    threatVector: 'Şifreli Çok Katmanlı Proxy Trafiği',
+    baseRiskScore: 58,
+    radiusDeg: 6.5,
+    severity: 'green',
+    targetAsset: 'Asya Transit Değişim Noktası',
+    recommendedMacro: 'Rotate VPN / Tor Hop',
+    macroCodeName: 'ONION_CIRCUIT_HOP',
+    details: 'Spektrum izlemesi nominal, trafiğin %99.2si kuantum güvenli kanallarda akıyor.',
+    detectedTime: '22 dk önce',
+    livePacketCount: '11.8 Tbps (Güvenli)',
+    pulseSpeed: 0.9,
+  },
+  {
+    id: 'ara-10',
+    name: 'Zurich Tor Exit & Güvenli Omurga',
+    coords: [8.5417, 47.3769],
+    agentId: 'ghost-s',
+    agentName: 'Ghost-S',
+    category: 'Anonim Tünel',
+    threatVector: '3-Hop WireGuard & Onion Çıkış Düğümü',
+    baseRiskScore: 52,
+    radiusDeg: 6,
+    severity: 'green',
+    targetAsset: 'Avrupa Anonim İstihbarat Çıkışı',
+    recommendedMacro: 'Scrub Fingerprint',
+    macroCodeName: 'SYNTHETIC_MASKING',
+    details: 'İzole tünel devrede, sentetik gürültü maskelemesi %100 gizlilik sağlıyor.',
+    detectedTime: '25 dk önce',
+    livePacketCount: '3.4 Gbps (İzole)',
+    pulseSpeed: 0.8,
+  },
+];
 
 export const TACTICAL_TRAFFIC_CLUSTERS: TacticalTrafficCluster[] = [
   {
@@ -98,55 +336,55 @@ export const TACTICAL_TRAFFIC_CLUSTERS: TacticalTrafficCluster[] = [
     name: 'Frankfurt DE-CIX',
     coords: [8.6821, 50.1109],
     baseIntensity: 0.95,
-    baseRadius: 38,
+    baseRadius: 36,
     throughput: '34.8 Tbps',
     packetRate: '8.4M pps',
     threatLevel: 'Critical',
-    phase: 0.1,
+    phase: 0,
   },
   {
     id: 'cl-2',
-    name: 'Istanbul Marmara IXP',
+    name: 'Istanbul NIX Hub',
     coords: [28.9784, 41.0082],
     baseIntensity: 0.88,
     baseRadius: 34,
     throughput: '18.2 Tbps',
-    packetRate: '5.1M pps',
+    packetRate: '4.6M pps',
     threatLevel: 'Critical',
     phase: 1.2,
   },
   {
     id: 'cl-3',
-    name: 'Ashburn / Washington DC',
-    coords: [-77.0369, 38.9072],
-    baseIntensity: 0.98,
-    baseRadius: 42,
-    throughput: '52.1 Tbps',
-    packetRate: '12.8M pps',
-    threatLevel: 'Critical',
-    phase: 2.3,
+    name: 'London LINX',
+    coords: [-0.1276, 51.5074],
+    baseIntensity: 0.72,
+    baseRadius: 28,
+    throughput: '22.5 Tbps',
+    packetRate: '5.1M pps',
+    threatLevel: 'High',
+    phase: 2.1,
   },
   {
     id: 'cl-4',
-    name: 'Tokyo JPIX',
-    coords: [139.6917, 35.6895],
-    baseIntensity: 0.82,
-    baseRadius: 32,
-    throughput: '24.5 Tbps',
-    packetRate: '6.3M pps',
-    threatLevel: 'High',
+    name: 'Washington Equinix Ashburn',
+    coords: [-77.0369, 38.9072],
+    baseIntensity: 0.91,
+    baseRadius: 35,
+    throughput: '41.2 Tbps',
+    packetRate: '9.8M pps',
+    threatLevel: 'Critical',
     phase: 3.4,
   },
   {
     id: 'cl-5',
-    name: 'London LINX',
-    coords: [-0.1276, 51.5074],
-    baseIntensity: 0.74,
-    baseRadius: 30,
-    throughput: '21.0 Tbps',
-    packetRate: '4.9M pps',
-    threatLevel: 'High',
-    phase: 4.1,
+    name: 'Tokyo JPIX',
+    coords: [139.6917, 35.6895],
+    baseIntensity: 0.65,
+    baseRadius: 26,
+    throughput: '19.8 Tbps',
+    packetRate: '3.9M pps',
+    threatLevel: 'Elevated',
+    phase: 4.2,
   },
   {
     id: 'cl-6',
@@ -208,29 +446,115 @@ export const TACTICAL_TRAFFIC_CLUSTERS: TacticalTrafficCluster[] = [
 interface Cyber3DGlobeProps {
   onAskAssistant: (question: string) => void;
   isLowBattery?: boolean;
+  alerts?: GlobeAlert[];
+  agentsTelemetry?: AgentTelemetry[];
 }
 
-export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLowBattery = false }) => {
+export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
+  onAskAssistant,
+  isLowBattery = false,
+  alerts = [],
+  agentsTelemetry = [],
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedThreat, setSelectedThreat] = useState<CyberThreatPoint | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<TacticalTrafficCluster | null>(null);
+  const [selectedRiskArea, setSelectedRiskArea] = useState<AgentRiskArea | null>(null);
+
   const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
   const [isRadialOpen, setIsRadialOpen] = useState<boolean>(false);
-  const [activeListTab, setActiveListTab] = useState<'threats' | 'clusters'>('threats');
+  const [activeListTab, setActiveListTab] = useState<'agent-risks' | 'threats' | 'clusters'>('agent-risks');
+  const [filterAgent, setFilterAgent] = useState<string>('ALL');
+  const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
   const [filterAttackType, setFilterAttackType] = useState<string>('ALL');
   const [filterRegion, setFilterRegion] = useState<string>('GLOBAL');
   const [isRotating, setIsRotating] = useState(true);
   const rotationRef = useRef<[number, number]>([0, -20]);
 
-  const filteredThreats = SAMPLE_THREATS.filter((t) => {
-    const matchType = filterAttackType === 'ALL' || t.attackType === filterAttackType;
-    const matchRegion =
-      filterRegion === 'GLOBAL' ||
-      t.originName.toLowerCase().includes(filterRegion.toLowerCase()) ||
-      t.targetName.toLowerCase().includes(filterRegion.toLowerCase());
-    return matchType && matchRegion;
-  });
+  // Dynamic alerts severity analysis
+  const alertStats = useMemo(() => {
+    const critical = alerts.filter((a) => a.severity === 'red').length;
+    const warning = alerts.filter((a) => a.severity === 'yellow').length;
+    const green = alerts.filter((a) => a.severity === 'green').length;
 
+    let overallSeverity: 'red' | 'yellow' | 'green' = 'green';
+    let severityScore = 0.2; // 0 to 1
+
+    if (critical > 0) {
+      overallSeverity = 'red';
+      severityScore = Math.min(1.0, 0.75 + critical * 0.05);
+    } else if (warning > 0) {
+      overallSeverity = 'yellow';
+      severityScore = Math.min(0.7, 0.45 + warning * 0.05);
+    } else {
+      overallSeverity = 'green';
+      severityScore = 0.2;
+    }
+
+    return {
+      critical,
+      warning,
+      green,
+      overallSeverity,
+      severityScore,
+    };
+  }, [alerts]);
+
+  // Keep risk areas state so they can dynamically adjust with incoming alerts
+  const [riskAreas, setRiskAreas] = useState<AgentRiskArea[]>(INITIAL_AGENT_RISK_AREAS);
+
+  // Sync risk areas severity when alerts arrive from autonomous agents
+  useEffect(() => {
+    if (!alerts || alerts.length === 0) return;
+    const latestAlert = alerts[alerts.length - 1];
+
+    setRiskAreas((prev) =>
+      prev.map((area) => {
+        // If alert matches the agent, temporarily surge its risk score
+        const isTargetAgent =
+          (latestAlert.title.toLowerCase().includes('sentinel') && area.agentId === 'sentinel-x') ||
+          (latestAlert.title.toLowerCase().includes('guardian') && area.agentId === 'guardian-v') ||
+          (latestAlert.title.toLowerCase().includes('ghost') && area.agentId === 'ghost-s');
+
+        if (isTargetAgent) {
+          return {
+            ...area,
+            severity: latestAlert.severity,
+            baseRiskScore:
+              latestAlert.severity === 'red'
+                ? Math.min(99, area.baseRiskScore + 5)
+                : latestAlert.severity === 'yellow'
+                ? Math.max(70, area.baseRiskScore)
+                : area.baseRiskScore,
+            detectedTime: 'Şimdi (Canlı Ajan Raporu)',
+          };
+        }
+        return area;
+      })
+    );
+  }, [alerts]);
+
+  // Filtered lists
+  const filteredRiskAreas = useMemo(() => {
+    return riskAreas.filter((a) => {
+      const matchAgent = filterAgent === 'ALL' || a.agentId === filterAgent;
+      const matchSev = filterSeverity === 'ALL' || a.severity === filterSeverity;
+      return matchAgent && matchSev;
+    });
+  }, [riskAreas, filterAgent, filterSeverity]);
+
+  const filteredThreats = useMemo(() => {
+    return SAMPLE_THREATS.filter((t) => {
+      const matchType = filterAttackType === 'ALL' || t.attackType === filterAttackType;
+      const matchRegion =
+        filterRegion === 'GLOBAL' ||
+        t.originName.toLowerCase().includes(filterRegion.toLowerCase()) ||
+        t.targetName.toLowerCase().includes(filterRegion.toLowerCase());
+      return matchType && matchRegion;
+    });
+  }, [filterAttackType, filterRegion]);
+
+  // D3 Canvas Globe & Heat-Map Renderer
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -239,7 +563,12 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
 
     const width = canvas.width;
     const height = canvas.height;
-    const projection = d3.geoOrthographic().scale(width / 2.3).translate([width / 2, height / 2]).clipAngle(90);
+    const projection = d3
+      .geoOrthographic()
+      .scale(width / 2.3)
+      .translate([width / 2, height / 2])
+      .clipAngle(90);
+
     const path = d3.geoPath().projection(projection).context(ctx);
     const graticule = d3.geoGraticule10();
 
@@ -249,7 +578,14 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
     const fpsLimit = isLowBattery ? 12 : 60;
     const frameInterval = 1000 / fpsLimit;
 
-    // Custom Canvas Globe Renderer with atmosphere, graticule, points and arcs
+    // Helper: true great-circle distance check on front hemisphere
+    const isVisibleOnFrontHemisphere = (coords: [number, number]): boolean => {
+      const rot = projection.rotate();
+      // True distance in radians to projection center
+      const dist = d3.geoDistance(coords, [-rot[0], -rot[1]]);
+      return dist < Math.PI / 2;
+    };
+
     const render = (time: number) => {
       const delta = time - lastRenderTime;
 
@@ -260,84 +596,199 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
 
       lastRenderTime = time - (delta % frameInterval);
 
-      // Disable rotation and slow down wave in low battery mode
+      // Rotate globe
       if (isRotating && !isLowBattery) {
         rotationRef.current[0] += 0.3;
       }
-      
+
       projection.rotate([rotationRef.current[0], rotationRef.current[1]]);
-      
+
       if (!isLowBattery) {
-        waveProgress = (waveProgress + 0.03) % 1;
+        waveProgress = (waveProgress + 0.025) % 1;
       }
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Outer Glow Atmosphere (Disable in low battery)
+      const sevLevel = alertStats.overallSeverity;
+      const sevScore = alertStats.severityScore;
+
+      // -------------------------------------------------------------
+      // 1. Dynamic D3 Color Scale Generator for the Heat-Map
+      // -------------------------------------------------------------
+      // Shifts colors dynamically based on alert severity:
+      // Red: Blazing Crimson (#ef4444) -> Molten Orange (#f97316) -> Deep Ember (#991b1b)
+      // Yellow: Bright Amber (#f59e0b) -> Gold (#fbbf24) -> Electric Blue (#3b82f6)
+      // Green: Deep Parliament Blue (#1e3a8a) -> Cyber Cyan (#06b6d4) -> Emerald (#10b981)
+      const d3HeatScale = d3
+        .scaleLinear<string>()
+        .domain([0, 0.35, 0.75, 1.0])
+        .range(
+          sevLevel === 'red'
+            ? [
+                'rgba(239, 68, 68, 0.95)', // Peak danger crimson
+                'rgba(249, 115, 22, 0.85)', // Molten orange
+                'rgba(185, 28, 28, 0.55)', // Deep ember
+                'rgba(127, 29, 29, 0.0)',  // Fade out
+              ]
+            : sevLevel === 'yellow'
+            ? [
+                'rgba(245, 158, 11, 0.92)', // Warning amber
+                'rgba(251, 191, 36, 0.78)', // Radiant gold
+                'rgba(59, 130, 246, 0.48)', // Electric blue boundary
+                'rgba(30, 58, 138, 0.0)',  // Fade out
+              ]
+            : [
+                'rgba(59, 130, 246, 0.88)', // Parliament blue
+                'rgba(6, 182, 212, 0.72)', // Cyber cyan
+                'rgba(16, 185, 129, 0.42)', // Emerald security
+                'rgba(30, 58, 138, 0.0)',  // Fade out
+              ]
+        )
+        .interpolate(d3.interpolateRgb);
+
+      // -------------------------------------------------------------
+      // 2. Dynamic Outer Atmosphere Glow (Reflects Alert Severity)
+      // -------------------------------------------------------------
       if (!isLowBattery) {
-        const grad = ctx.createRadialGradient(width / 2, height / 2, projection.scale() * 0.95, width / 2, height / 2, projection.scale() * 1.15);
-        grad.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = grad;
+        const atmoGrad = ctx.createRadialGradient(
+          width / 2,
+          height / 2,
+          projection.scale() * 0.96,
+          width / 2,
+          height / 2,
+          projection.scale() * 1.18
+        );
+
+        if (sevLevel === 'red') {
+          atmoGrad.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+          atmoGrad.addColorStop(0.5, 'rgba(249, 115, 22, 0.15)');
+          atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        } else if (sevLevel === 'yellow') {
+          atmoGrad.addColorStop(0, 'rgba(245, 158, 11, 0.30)');
+          atmoGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.12)');
+          atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        } else {
+          atmoGrad.addColorStop(0, 'rgba(37, 99, 235, 0.25)');
+          atmoGrad.addColorStop(0.6, 'rgba(6, 182, 212, 0.08)');
+          atmoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        }
+
+        ctx.fillStyle = atmoGrad;
         ctx.beginPath();
-        ctx.arc(width / 2, height / 2, projection.scale() * 1.15, 0, Math.PI * 2);
+        ctx.arc(width / 2, height / 2, projection.scale() * 1.18, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // 2. Globe Sphere Ocean Base
+      // -------------------------------------------------------------
+      // 3. Globe Sphere Base & Graticule
+      // -------------------------------------------------------------
       ctx.beginPath();
       ctx.arc(width / 2, height / 2, projection.scale(), 0, Math.PI * 2);
       ctx.fillStyle = '#030814';
       ctx.fill();
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+      ctx.strokeStyle =
+        sevLevel === 'red'
+          ? 'rgba(239, 68, 68, 0.4)'
+          : sevLevel === 'yellow'
+          ? 'rgba(245, 158, 11, 0.4)'
+          : 'rgba(59, 130, 246, 0.4)';
       ctx.stroke();
 
-      // 3. Graticule Lines
+      // Graticule Lines
       ctx.beginPath();
       path(graticule);
-      ctx.strokeStyle = 'rgba(30, 58, 138, 0.3)';
+      ctx.strokeStyle =
+        sevLevel === 'red'
+          ? 'rgba(153, 27, 27, 0.25)'
+          : 'rgba(30, 58, 138, 0.3)';
       ctx.lineWidth = 0.5;
       ctx.stroke();
 
-      // 3.5. Tactical Heatmap Overlay: Active Network Traffic Clusters (Parliament-Blue to Danger-Red Gradient Scale)
+      // -------------------------------------------------------------
+      // 4. D3 Visual Heat-Map Overlay: Agent Identified High-Risk Areas
+      // -------------------------------------------------------------
       if (showHeatmap) {
         ctx.save();
         ctx.globalCompositeOperation = isLowBattery ? 'source-over' : 'lighter';
 
-        TACTICAL_TRAFFIC_CLUSTERS.forEach((cluster) => {
-          if (!isPointVisible(cluster.coords, projection)) return;
+        // 4A. Plot D3 Geodesic Spherical Disks (d3.geoCircle on the 3D globe)
+        filteredRiskAreas.forEach((area) => {
+          const timeSec = time * 0.0025;
+          const pulse = Math.sin(timeSec * area.pulseSpeed);
+          // Scale geodesic radius based on risk score and oscillation
+          const dynamicRadiusDeg = Math.max(3.5, area.radiusDeg + pulse * 1.8);
 
-          const pt = projection(cluster.coords);
+          // Generate true spherical great-circle geometry using D3
+          const circleFeature = d3
+            .geoCircle()
+            .center(area.coords)
+            .radius(dynamicRadiusDeg)();
+
+          ctx.beginPath();
+          path(circleFeature);
+
+          // Color calculation: Blend area's severity and overall alert level
+          const effectiveSeverity =
+            area.severity === 'red' || sevLevel === 'red'
+              ? 'red'
+              : area.severity === 'yellow' || sevLevel === 'yellow'
+              ? 'yellow'
+              : 'green';
+
+          const normalizedRisk = Math.min(1.0, (area.baseRiskScore / 100) * (0.8 + sevScore * 0.2));
+          // Use D3 heat color scale
+          ctx.fillStyle = d3HeatScale(1.0 - normalizedRisk * 0.7);
+          ctx.globalAlpha = isLowBattery ? 0.35 : 0.65;
+          ctx.fill();
+
+          // Outer contour stroke
+          ctx.lineWidth = effectiveSeverity === 'red' ? 1.4 : 1.0;
+          ctx.strokeStyle =
+            effectiveSeverity === 'red'
+              ? 'rgba(239, 68, 68, 0.85)'
+              : effectiveSeverity === 'yellow'
+              ? 'rgba(245, 158, 11, 0.8)'
+              : 'rgba(59, 130, 246, 0.7)';
+          ctx.stroke();
+        });
+
+        // 4B. High-Risk Areas Radial Heat Gradients & Agent Callout Beacons
+        filteredRiskAreas.forEach((area) => {
+          if (!isVisibleOnFrontHemisphere(area.coords)) return;
+          const pt = projection(area.coords);
           if (!pt) return;
 
-          // Organic oscillation for live tactical cluster pulsation
           const timeSec = time * 0.0025;
-          const pulse = Math.sin(timeSec + cluster.phase);
-          const intensity = Math.min(1, Math.max(0.2, cluster.baseIntensity + pulse * 0.08));
-          const radius = isLowBattery
-            ? cluster.baseRadius * 0.75
-            : cluster.baseRadius * (1 + pulse * 0.15);
+          const pulse = Math.sin(timeSec * area.pulseSpeed);
+          const effectiveSeverity =
+            area.severity === 'red' || sevLevel === 'red'
+              ? 'red'
+              : area.severity === 'yellow' || sevLevel === 'yellow'
+              ? 'yellow'
+              : 'green';
 
-          // Radial Gradient: Parliament-Blue (#1e3a8a) -> Cyan/Amber (#3b82f6/#f59e0b) -> Danger-Red (#ef4444)
+          const radius = isLowBattery
+            ? area.radiusDeg * 3.5
+            : area.radiusDeg * 4.2 * (1 + pulse * 0.18);
+
+          // High-fidelity radial gradient
           const grad = ctx.createRadialGradient(pt[0], pt[1], 0, pt[0], pt[1], radius);
 
-          if (intensity >= 0.78) {
-            // Danger-Red High Intensity Cluster
-            grad.addColorStop(0, `rgba(239, 68, 68, ${0.85 * intensity})`); // Peak Danger-Red
-            grad.addColorStop(0.3, `rgba(245, 158, 11, ${0.65 * intensity})`); // Amber midpoint
-            grad.addColorStop(0.65, `rgba(30, 58, 138, ${0.48 * intensity})`); // Parliament-Blue edge
-            grad.addColorStop(1, 'rgba(30, 58, 138, 0)'); // Fade
-          } else if (intensity >= 0.52) {
-            // Medium / Elevated Traffic
-            grad.addColorStop(0, `rgba(245, 158, 11, ${0.8 * intensity})`); // Amber core
-            grad.addColorStop(0.38, `rgba(59, 130, 246, ${0.6 * intensity})`); // Vibrant blue
-            grad.addColorStop(0.72, `rgba(30, 58, 138, ${0.4 * intensity})`); // Parliament-Blue
+          if (effectiveSeverity === 'red') {
+            grad.addColorStop(0, `rgba(239, 68, 68, ${0.95 * (0.8 + pulse * 0.2)})`); // Blazing Red Core
+            grad.addColorStop(0.3, 'rgba(249, 115, 22, 0.75)'); // Molten Orange
+            grad.addColorStop(0.65, 'rgba(185, 28, 28, 0.45)'); // Dark Red
+            grad.addColorStop(1, 'rgba(127, 29, 29, 0)');
+          } else if (effectiveSeverity === 'yellow') {
+            grad.addColorStop(0, `rgba(245, 158, 11, ${0.9 * (0.8 + pulse * 0.2)})`); // Amber Core
+            grad.addColorStop(0.35, 'rgba(251, 191, 36, 0.68)'); // Gold
+            grad.addColorStop(0.7, 'rgba(59, 130, 246, 0.38)'); // Blue edge
             grad.addColorStop(1, 'rgba(30, 58, 138, 0)');
           } else {
-            // Low Traffic Baseline (Parliament-Blue dominant)
-            grad.addColorStop(0, `rgba(59, 130, 246, ${0.75 * intensity})`); // Cyan/Blue Core
-            grad.addColorStop(0.5, `rgba(30, 58, 138, ${0.55 * intensity})`); // Parliament-Blue
+            grad.addColorStop(0, `rgba(59, 130, 246, ${0.85 * (0.8 + pulse * 0.2)})`); // Cyan/Blue Core
+            grad.addColorStop(0.4, 'rgba(6, 182, 212, 0.6)'); // Cyan
+            grad.addColorStop(0.75, 'rgba(16, 185, 129, 0.35)'); // Emerald edge
             grad.addColorStop(1, 'rgba(30, 58, 138, 0)');
           }
 
@@ -346,66 +797,107 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
           ctx.arc(pt[0], pt[1], radius, 0, Math.PI * 2);
           ctx.fill();
 
-          // Concentric tactical contour / shockwave ring
+          // Concentric shockwave ring
           if (!isLowBattery) {
+            const shockRadius = radius * 0.5 + waveProgress * (radius * 0.5);
             ctx.beginPath();
-            ctx.arc(pt[0], pt[1], radius * 0.55, 0, Math.PI * 2);
-            ctx.strokeStyle = intensity >= 0.78
-              ? `rgba(239, 68, 68, ${0.35 * (1 - waveProgress)})`
-              : `rgba(30, 58, 138, ${0.45 * (1 - waveProgress)})`;
-            ctx.lineWidth = 1;
+            ctx.arc(pt[0], pt[1], shockRadius, 0, Math.PI * 2);
+            ctx.strokeStyle =
+              effectiveSeverity === 'red'
+                ? `rgba(239, 68, 68, ${0.5 * (1 - waveProgress)})`
+                : effectiveSeverity === 'yellow'
+                ? `rgba(245, 158, 11, ${0.45 * (1 - waveProgress)})`
+                : `rgba(59, 130, 246, ${0.4 * (1 - waveProgress)})`;
+            ctx.lineWidth = 1.2;
             ctx.stroke();
 
-            // Core hotspot dot
+            // Core beacon dot
             ctx.beginPath();
-            ctx.arc(pt[0], pt[1], 2.5, 0, Math.PI * 2);
-            ctx.fillStyle = intensity >= 0.78 ? '#fee2e2' : '#bfdbfe';
+            ctx.arc(pt[0], pt[1], 3.2, 0, Math.PI * 2);
+            ctx.fillStyle =
+              effectiveSeverity === 'red'
+                ? '#fee2e2'
+                : effectiveSeverity === 'yellow'
+                ? '#fef3c7'
+                : '#e0f2fe';
             ctx.fill();
           }
+        });
+
+        // 4C. Tactical Traffic Clusters (Also shifting dynamically with D3 scale)
+        TACTICAL_TRAFFIC_CLUSTERS.forEach((cluster) => {
+          if (!isVisibleOnFrontHemisphere(cluster.coords)) return;
+          const pt = projection(cluster.coords);
+          if (!pt) return;
+
+          const timeSec = time * 0.0025;
+          const pulse = Math.sin(timeSec + cluster.phase);
+          const intensity = Math.min(1, Math.max(0.2, cluster.baseIntensity + pulse * 0.08));
+          const radius = isLowBattery
+            ? cluster.baseRadius * 0.7
+            : cluster.baseRadius * (1 + pulse * 0.12);
+
+          const grad = ctx.createRadialGradient(pt[0], pt[1], 0, pt[0], pt[1], radius);
+          const clusterColor = d3HeatScale(1.0 - intensity);
+
+          grad.addColorStop(0, clusterColor);
+          grad.addColorStop(0.5, d3HeatScale(Math.min(1.0, 1.2 - intensity)));
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(pt[0], pt[1], radius, 0, Math.PI * 2);
+          ctx.fill();
         });
 
         ctx.restore();
       }
 
-      // 4. Render Threats & Glow Arcs
+      // -------------------------------------------------------------
+      // 5. Render Cyber Threats & Glow Arcs
+      // -------------------------------------------------------------
       filteredThreats.forEach((threat) => {
-        const originVisible = isPointVisible(threat.originCoords, projection);
-        const targetVisible = isPointVisible(threat.targetCoords, projection);
+        const originVisible = isVisibleOnFrontHemisphere(threat.originCoords);
+        const targetVisible = isVisibleOnFrontHemisphere(threat.targetCoords);
 
         const o = projection(threat.originCoords);
         const t = projection(threat.targetCoords);
 
-        // Draw Glow Arcs if coordinates visible
         if (o && t) {
           const midX = (o[0] + t[0]) / 2;
           const midY = (o[1] + t[1]) / 2 - 45;
 
-          // Outer Glow Layer 1 (Disable or reduce in low battery)
+          // Outer Glow
           if (!isLowBattery) {
             ctx.beginPath();
             ctx.moveTo(o[0], o[1]);
             ctx.quadraticCurveTo(midX, midY, t[0], t[1]);
-            ctx.strokeStyle = threat.severity === 'Critical' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)';
+            ctx.strokeStyle =
+              threat.severity === 'Critical'
+                ? 'rgba(239, 68, 68, 0.28)'
+                : 'rgba(245, 158, 11, 0.25)';
             ctx.lineWidth = 6;
             ctx.stroke();
           }
 
-          // Core Arc Layer 2
+          // Core Arc
           ctx.beginPath();
           ctx.moveTo(o[0], o[1]);
           ctx.quadraticCurveTo(midX, midY, t[0], t[1]);
-          ctx.strokeStyle = threat.severity === 'Critical' ? 'rgba(248, 113, 113, 0.9)' : 'rgba(251, 191, 36, 0.9)';
+          ctx.strokeStyle =
+            threat.severity === 'Critical'
+              ? 'rgba(248, 113, 113, 0.95)'
+              : 'rgba(251, 191, 36, 0.9)';
           ctx.lineWidth = 1.8;
           if (!isLowBattery) ctx.setLineDash([6, 4]);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Animated Glowing Head Particle (Freeze in low battery)
+          // Glowing Particle
           const prog = isLowBattery ? 0.5 : waveProgress;
           const px = (1 - prog) * (1 - prog) * o[0] + 2 * (1 - prog) * prog * midX + prog * prog * t[0];
           const py = (1 - prog) * (1 - prog) * o[1] + 2 * (1 - prog) * prog * midY + prog * prog * t[1];
 
-          // Particle Glow Halo (Disable in low battery)
           if (!isLowBattery) {
             const pGrad = ctx.createRadialGradient(px, py, 0, px, py, 8);
             pGrad.addColorStop(0, threat.severity === 'Critical' ? '#ef4444' : '#f59e0b');
@@ -416,16 +908,14 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             ctx.fill();
           }
 
-          // Particle Core
           ctx.beginPath();
           ctx.arc(px, py, 3.5, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
         }
 
-        // Draw Origin Point & Pulsing Shockwave
+        // Origin shockwave & core dot
         if (o && originVisible) {
-          // Pulse Wave (Disable in low battery)
           if (!isLowBattery) {
             const pulseR = 4 + waveProgress * 14;
             ctx.beginPath();
@@ -435,7 +925,6 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             ctx.stroke();
           }
 
-          // Core Dot
           ctx.beginPath();
           ctx.arc(o[0], o[1], 4, 0, Math.PI * 2);
           ctx.fillStyle = '#ef4444';
@@ -445,7 +934,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
           ctx.stroke();
         }
 
-        // Draw Target Point
+        // Target dot
         if (t && targetVisible) {
           ctx.beginPath();
           ctx.arc(t[0], t[1], 3.5, 0, Math.PI * 2);
@@ -465,23 +954,35 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isRotating, filterAttackType, filterRegion, isLowBattery, showHeatmap]);
+  }, [
+    isRotating,
+    filterAttackType,
+    filterRegion,
+    isLowBattery,
+    showHeatmap,
+    filteredRiskAreas,
+    alertStats,
+  ]);
 
-  // Helper check if lat/long is on visible front hemisphere
-  function isPointVisible(coords: [number, number], proj: d3.GeoProjection): boolean {
-    const r = proj.rotate();
-    const p: [number, number] = [coords[0] + r[0], coords[1] + r[1]];
-    return p[0] > -90 && p[0] < 90;
-  }
-
-  // Handle Canvas Drag Rotation
+  // Handle Drag to Rotate & Tap to Select Risk Area
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     let lastX = e.clientX;
     let lastY = e.clientY;
+    let moved = false;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
     const handleMouseMove = (me: MouseEvent) => {
       const dx = me.clientX - lastX;
       const dy = me.clientY - lastY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        moved = true;
+      }
       rotationRef.current[0] += dx * 0.4;
       rotationRef.current[1] -= dy * 0.4;
       lastX = me.clientX;
@@ -491,10 +992,43 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+
+      // If user merely tapped/clicked without substantial dragging, test hit on high-risk area
+      if (!moved) {
+        const width = canvas.width;
+        const height = canvas.height;
+        const projection = d3
+          .geoOrthographic()
+          .scale(width / 2.3)
+          .translate([width / 2, height / 2])
+          .rotate([rotationRef.current[0], rotationRef.current[1]])
+          .clipAngle(90);
+
+        for (const area of filteredRiskAreas) {
+          const rot = projection.rotate();
+          const distRad = d3.geoDistance(area.coords, [-rot[0], -rot[1]]);
+          if (distRad < Math.PI / 2) {
+            const pt = projection(area.coords);
+            if (pt) {
+              const distPx = Math.hypot(pt[0] - clickX, pt[1] - clickY);
+              if (distPx < 22) {
+                setSelectedRiskArea(area);
+                return;
+              }
+            }
+          }
+        }
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Focus smoothly on coordinates
+  const focusOnCoordinates = (coords: [number, number]) => {
+    rotationRef.current[0] = -coords[0];
+    rotationRef.current[1] = -coords[1];
   };
 
   return (
@@ -509,11 +1043,39 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             </h3>
           </div>
           <p className="text-xs text-blue-300/80 mt-0.5">
-            D3.js tabanlı canlı 3D dünya küresi; gerçek zamanlı siber saldırı dalgaları, sinyal kesişimleri ve exploit kaynakları.
+            D3.js tabanlı canlı jeodezik ısı haritası; otonom ajanların belirlediği yüksek riskli bölgeleri ve alarm ciddiyetini dinamik renklerle görselleştirir.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Real-time Dynamic Heatmap Severity Badge */}
+          <div
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 border shadow-md transition ${
+              alertStats.overallSeverity === 'red'
+                ? 'bg-red-950/80 border-red-700 text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.35)]'
+                : alertStats.overallSeverity === 'yellow'
+                ? 'bg-amber-950/80 border-amber-700 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.25)]'
+                : 'bg-blue-950/80 border-blue-700 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.25)]'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                alertStats.overallSeverity === 'red'
+                  ? 'bg-red-500 animate-ping'
+                  : alertStats.overallSeverity === 'yellow'
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-emerald-400 animate-pulse'
+              }`}
+            />
+            <span>
+              {alertStats.overallSeverity === 'red'
+                ? `KRİTİK ISI MODU (${alertStats.critical} Alarm)`
+                : alertStats.overallSeverity === 'yellow'
+                ? `UYARI ISI MODU (${alertStats.warning} Şüpheli)`
+                : 'NOMİNAL SAVUNMA MODU'}
+            </span>
+          </div>
+
           <button
             onClick={() => setIsRadialOpen(!isRadialOpen)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 ${
@@ -531,13 +1093,25 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             onClick={() => setShowHeatmap(!showHeatmap)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 ${
               showHeatmap
-                ? 'bg-blue-950/80 text-blue-200 border-blue-500 shadow-[0_0_12px_rgba(30,58,138,0.5)]'
+                ? alertStats.overallSeverity === 'red'
+                  ? 'bg-red-950/90 text-red-200 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                  : alertStats.overallSeverity === 'yellow'
+                  ? 'bg-amber-950/90 text-amber-200 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                  : 'bg-blue-950/80 text-blue-200 border-blue-500 shadow-[0_0_12px_rgba(30,58,138,0.5)]'
                 : 'bg-black text-slate-400 border-gray-800 hover:border-gray-700'
             }`}
-            title="Taktiksel Ağ Trafiği Isı Haritası (Heatmap) Katmanını Aç/Kapat"
+            title="D3 Taktiksel Isı Haritası (Heat-Map) Katmanını Aç/Kapat"
           >
-            <Flame className={`w-3.5 h-3.5 ${showHeatmap ? 'text-red-400 animate-pulse' : 'text-gray-500'}`} />
-            <span>{showHeatmap ? 'Isı Haritası: Aktif' : 'Isı Haritası: Kapalı'}</span>
+            <Flame
+              className={`w-3.5 h-3.5 ${
+                showHeatmap
+                  ? alertStats.overallSeverity === 'red'
+                    ? 'text-red-400 animate-bounce'
+                    : 'text-amber-400 animate-pulse'
+                  : 'text-gray-500'
+              }`}
+            />
+            <span>{showHeatmap ? 'D3 Isı Haritası: Aktif' : 'D3 Isı Haritası: Kapalı'}</span>
           </button>
 
           <button
@@ -556,61 +1130,133 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
 
       {/* Filter Control Bar */}
       <div className="flex flex-wrap items-center gap-2 mb-4 p-2.5 rounded-2xl bg-black border border-blue-900/40 text-xs">
-        <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[11px] uppercase mr-2">
+        <div className="flex items-center gap-1.5 text-blue-400 font-bold text-[11px] uppercase mr-1">
           <Filter className="w-3.5 h-3.5" />
           <span>Filtrele:</span>
         </div>
 
-        {/* Attack Type Filter */}
-        <select
-          value={filterAttackType}
-          onChange={(e) => setFilterAttackType(e.target.value)}
-          className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
-        >
-          <option value="ALL">Tüm Saldırı Türleri</option>
-          <option value="SS7 Intercept">SS7 Intercept</option>
-          <option value="Zero-Day">Zero-Day</option>
-          <option value="Ransomware">Ransomware</option>
-          <option value="DDOS">DDOS</option>
-          <option value="RAT Infection">RAT Infection</option>
-        </select>
+        {/* Tab-aware filters */}
+        {activeListTab === 'agent-risks' ? (
+          <>
+            <select
+              value={filterAgent}
+              onChange={(e) => setFilterAgent(e.target.value)}
+              className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
+            >
+              <option value="ALL">Tüm Otonom Ajanlar</option>
+              <option value="sentinel-x">Sentinel-X (Ağ Perimetresi)</option>
+              <option value="guardian-v">Guardian-V (Sistem Bütünlüğü)</option>
+              <option value="ghost-s">Ghost-S (Darknet & OSINT)</option>
+            </select>
 
-        {/* Region Filter */}
-        <select
-          value={filterRegion}
-          onChange={(e) => setFilterRegion(e.target.value)}
-          className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
-        >
-          <option value="GLOBAL">Tüm Küre (Global)</option>
-          <option value="Istanbul">Türkiye / Istanbul</option>
-          <option value="Frankfurt">Almanya / Frankfurt</option>
-          <option value="Washington">ABD / Washington</option>
-          <option value="Beijing">Çin / Pekin</option>
-        </select>
+            <select
+              value={filterSeverity}
+              onChange={(e) => setFilterSeverity(e.target.value)}
+              className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
+            >
+              <option value="ALL">Tüm Risk Seviyeleri</option>
+              <option value="red">Kritik Risk (Kırmızı)</option>
+              <option value="yellow">Yüksek / Uyarı (Sarı)</option>
+              <option value="green">Nominal / Güvenli (Mavi-Yeşil)</option>
+            </select>
+          </>
+        ) : (
+          <>
+            <select
+              value={filterAttackType}
+              onChange={(e) => setFilterAttackType(e.target.value)}
+              className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
+            >
+              <option value="ALL">Tüm Saldırı Türleri</option>
+              <option value="SS7 Intercept">SS7 Intercept</option>
+              <option value="Zero-Day">Zero-Day</option>
+              <option value="Ransomware">Ransomware</option>
+              <option value="DDOS">DDOS</option>
+              <option value="RAT Infection">RAT Infection</option>
+            </select>
 
-        <span className="ml-auto text-[11px] font-mono text-emerald-400">
-          {filteredThreats.length} Canlı Sinyal / Tehdit İzleniyor
-        </span>
+            <select
+              value={filterRegion}
+              onChange={(e) => setFilterRegion(e.target.value)}
+              className="bg-[#081226] border border-blue-800/80 rounded-xl px-2.5 py-1 text-white font-mono focus:outline-none"
+            >
+              <option value="GLOBAL">Tüm Küre (Global)</option>
+              <option value="Istanbul">Türkiye / Istanbul</option>
+              <option value="Frankfurt">Almanya / Frankfurt</option>
+              <option value="Washington">ABD / Washington</option>
+              <option value="Beijing">Çin / Pekin</option>
+            </select>
+          </>
+        )}
+
+        <div className="ml-auto flex items-center gap-3 text-[11px] font-mono">
+          <span className="text-red-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            {alertStats.critical} Kritik
+          </span>
+          <span className="text-amber-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            {alertStats.warning} Uyarı
+          </span>
+          <span className="text-emerald-400">
+            {filteredRiskAreas.length} Ajan Bölgesi
+          </span>
+        </div>
       </div>
 
       {/* Globe & Threat Details Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
         {/* Interactive Canvas 3D Globe Container */}
-        <div className="lg:col-span-2 relative flex items-center justify-center bg-black/80 rounded-2xl border border-blue-900/40 p-4 min-h-[340px]">
-          {/* Tactical Heatmap Scale Legend */}
+        <div className="lg:col-span-2 relative flex items-center justify-center bg-black/80 rounded-2xl border border-blue-900/40 p-4 min-h-[360px]">
+          {/* Dynamic D3 Heatmap Legend */}
           {showHeatmap && (
-            <div className="absolute top-3 right-3 bg-black/85 backdrop-blur-md border border-blue-900/60 rounded-xl px-3 py-2 flex flex-col gap-1 text-[10px] font-mono z-10 pointer-events-auto shadow-lg max-w-[230px]">
+            <div className="absolute top-3 right-3 bg-black/90 backdrop-blur-md border border-blue-900/70 rounded-xl px-3 py-2 flex flex-col gap-1.5 text-[10px] font-mono z-10 pointer-events-auto shadow-2xl max-w-[245px]">
               <div className="flex items-center justify-between text-gray-300">
                 <span className="font-bold flex items-center gap-1.5 text-blue-300">
-                  <Flame className="w-3.5 h-3.5 text-red-400" /> Taktiksel Isı Skalası
+                  <Flame
+                    className={`w-3.5 h-3.5 ${
+                      alertStats.overallSeverity === 'red'
+                        ? 'text-red-400 animate-pulse'
+                        : alertStats.overallSeverity === 'yellow'
+                        ? 'text-amber-400'
+                        : 'text-blue-400'
+                    }`}
+                  />
+                  <span>D3 Dinamik Isı Skalası</span>
                 </span>
-                <span className="text-emerald-400 text-[9px] font-bold animate-pulse">CANLI</span>
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                    alertStats.overallSeverity === 'red'
+                      ? 'bg-red-950 text-red-300 border-red-700 animate-pulse'
+                      : alertStats.overallSeverity === 'yellow'
+                      ? 'bg-amber-950 text-amber-300 border-amber-700'
+                      : 'bg-blue-950 text-blue-300 border-blue-700'
+                  }`}
+                >
+                  {alertStats.overallSeverity.toUpperCase()}
+                </span>
               </div>
-              <div className="w-full h-2 rounded-full overflow-hidden bg-gradient-to-r from-[#1e3a8a] via-[#f59e0b] to-[#ef4444] border border-blue-800/50" />
+
+              {/* Dynamic gradient bar reflecting current D3 color mapping */}
+              <div
+                className={`w-full h-2.5 rounded-full overflow-hidden border ${
+                  alertStats.overallSeverity === 'red'
+                    ? 'border-red-600/70 bg-gradient-to-r from-[#991b1b] via-[#ea580c] to-[#ef4444]'
+                    : alertStats.overallSeverity === 'yellow'
+                    ? 'border-amber-600/70 bg-gradient-to-r from-[#1e3a8a] via-[#f59e0b] to-[#fbbf24]'
+                    : 'border-blue-600/70 bg-gradient-to-r from-[#1e3a8a] via-[#06b6d4] to-[#10b981]'
+                }`}
+              />
+
               <div className="flex justify-between text-[8px] text-gray-400">
-                <span className="text-blue-400">Parlament (Düşük)</span>
-                <span className="text-amber-300">Orta</span>
-                <span className="text-red-400 font-bold">Tehlike (Kritik)</span>
+                <span>Düşük Risk</span>
+                <span>Orta Yoğunluk</span>
+                <span className="font-bold text-red-400">Tehlike (Kritik)</span>
+              </div>
+
+              <div className="pt-0.5 border-t border-gray-800 text-[8px] text-gray-400 flex justify-between">
+                <span>D3 Jeodezik Diskler: Aktif</span>
+                <span className="text-cyan-300">{filteredRiskAreas.length} Merkez</span>
               </div>
             </div>
           )}
@@ -618,7 +1264,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
           <canvas
             ref={canvasRef}
             width={480}
-            height={340}
+            height={360}
             onMouseDown={handleMouseDown}
             className="cursor-grab active:cursor-grabbing max-w-full"
           />
@@ -629,53 +1275,140 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             onToggle={() => setIsRadialOpen(!isRadialOpen)}
           />
 
-          <div className="absolute top-3 left-3 text-[10px] font-mono text-gray-500 pointer-events-none hidden sm:block">
-            🖱️ Fare ile sürükleyerek küreyi 360° döndürebilirsiniz.
+          <div className="absolute top-3 left-3 text-[10px] font-mono text-gray-400 pointer-events-none hidden sm:block bg-black/60 px-2 py-1 rounded-lg border border-gray-800">
+            🖱️ Çevirmek için sürükleyin • Detay için kırmızı/sarı disklere tıklayın
           </div>
 
           {showHeatmap && (
-            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 text-[9px] font-mono bg-black/80 border border-blue-900/40 px-2 py-1 rounded-lg text-blue-300 z-10">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-              <span>10 Taktiksel Trafik Kümesi Aktif (34.8 Tbps Tepe)</span>
+            <div className="absolute bottom-3 right-3 flex items-center gap-1.5 text-[9px] font-mono bg-black/85 border border-blue-900/60 px-2.5 py-1 rounded-lg text-blue-300 z-10">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  alertStats.overallSeverity === 'red'
+                    ? 'bg-red-500 animate-ping'
+                    : alertStats.overallSeverity === 'yellow'
+                    ? 'bg-amber-400 animate-ping'
+                    : 'bg-emerald-400'
+                }`}
+              />
+              <span>
+                {filteredRiskAreas.length} Otonom Ajan Bölgesi • D3 Jeodezik Projeksiyon
+              </span>
             </div>
           )}
         </div>
 
-        {/* Interactive Threat & Cluster List Panel */}
+        {/* Interactive Side Tabs Panel */}
         <div className="space-y-3">
           {/* Panel Tab Selector */}
           <div className="flex items-center gap-1 p-1 bg-black/70 border border-blue-900/40 rounded-xl text-xs font-mono">
             <button
-              onClick={() => setActiveListTab('threats')}
-              className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
-                activeListTab === 'threats'
-                  ? 'bg-blue-600/30 text-blue-200 border border-blue-500/50 shadow-sm'
+              onClick={() => setActiveListTab('agent-risks')}
+              className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition flex items-center justify-center gap-1 text-[11px] ${
+                activeListTab === 'agent-risks'
+                  ? 'bg-blue-600/40 text-blue-200 border border-blue-500/60 shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              <Radio className="w-3.5 h-3.5 text-red-400" />
+              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
+              <span>Ajan Risk ({filteredRiskAreas.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveListTab('threats')}
+              className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition flex items-center justify-center gap-1 text-[11px] ${
+                activeListTab === 'threats'
+                  ? 'bg-blue-600/40 text-blue-200 border border-blue-500/60 shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5 text-amber-400" />
               <span>Tehditler ({filteredThreats.length})</span>
             </button>
             <button
               onClick={() => setActiveListTab('clusters')}
-              className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition flex items-center justify-center gap-1 text-[11px] ${
                 activeListTab === 'clusters'
-                  ? 'bg-blue-600/30 text-blue-200 border border-blue-500/50 shadow-sm'
+                  ? 'bg-blue-600/40 text-blue-200 border border-blue-500/60 shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>Isı Kümeleri ({TACTICAL_TRAFFIC_CLUSTERS.length})</span>
+              <Flame className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Kümeler ({TACTICAL_TRAFFIC_CLUSTERS.length})</span>
             </button>
           </div>
 
-          {/* Tab 1: Threats */}
+          {/* Tab 1: Agent Risk Areas (Heat-Map Centric) */}
+          {activeListTab === 'agent-risks' && (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              {filteredRiskAreas.map((area) => {
+                const isCrit = area.severity === 'red';
+                const isWarn = area.severity === 'yellow';
+
+                return (
+                  <div
+                    key={area.id}
+                    onClick={() => {
+                      setSelectedRiskArea(area);
+                      focusOnCoordinates(area.coords);
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
+                      selectedRiskArea?.id === area.id
+                        ? 'bg-blue-900/50 border-blue-400 shadow-md ring-1 ring-blue-400'
+                        : 'bg-black/60 border-blue-900/40 hover:border-blue-700'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="font-bold text-white flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            isCrit
+                              ? 'bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse'
+                              : isWarn
+                              ? 'bg-amber-400 shadow-[0_0_6px_#f59e0b]'
+                              : 'bg-emerald-400 shadow-[0_0_6px_#10b981]'
+                          }`}
+                        />
+                        <span className="truncate max-w-[170px]">{area.name}</span>
+                      </div>
+
+                      <div className="text-[10px] font-mono text-gray-400 flex items-center gap-1.5">
+                        <span className="text-blue-300 font-semibold">[{area.agentName}]</span>
+                        <span>•</span>
+                        <span className="text-gray-300 truncate max-w-[130px]">{area.category}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`text-[9px] font-mono px-2 py-0.5 rounded border block font-bold ${
+                          isCrit
+                            ? 'bg-red-950/90 text-red-300 border-red-700 shadow-sm'
+                            : isWarn
+                            ? 'bg-amber-950/90 text-amber-300 border-amber-700'
+                            : 'bg-blue-950/90 text-blue-300 border-blue-700'
+                        }`}
+                      >
+                        %{area.baseRiskScore} RİSK
+                      </span>
+                      <span className="text-[9px] font-mono text-gray-500 mt-0.5 block">
+                        D3 Dairesi: {area.radiusDeg}°
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tab 2: Threats */}
           {activeListTab === 'threats' && (
-            <div className="space-y-2 max-h-[290px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               {filteredThreats.map((threat) => (
                 <div
                   key={threat.id}
-                  onClick={() => setSelectedThreat(threat)}
+                  onClick={() => {
+                    setSelectedThreat(threat);
+                    focusOnCoordinates(threat.originCoords);
+                  }}
                   className={`p-3 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
                     selectedThreat?.id === threat.id
                       ? 'bg-blue-900/40 border-blue-400 shadow-md'
@@ -699,9 +1432,9 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             </div>
           )}
 
-          {/* Tab 2: Tactical Traffic Clusters */}
+          {/* Tab 3: Tactical Traffic Clusters */}
           {activeListTab === 'clusters' && (
-            <div className="space-y-2 max-h-[290px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               {TACTICAL_TRAFFIC_CLUSTERS.map((cluster) => {
                 const isCrit = cluster.baseIntensity >= 0.78;
                 const isElev = cluster.baseIntensity >= 0.52;
@@ -710,9 +1443,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
                     key={cluster.id}
                     onClick={() => {
                       setSelectedCluster(cluster);
-                      // Smoothly rotate globe towards cluster coordinates
-                      rotationRef.current[0] = -cluster.coords[0];
-                      rotationRef.current[1] = -cluster.coords[1];
+                      focusOnCoordinates(cluster.coords);
                     }}
                     className={`p-2.5 rounded-xl border text-xs cursor-pointer transition flex items-center justify-between ${
                       selectedCluster?.id === cluster.id
@@ -763,9 +1494,134 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
         </div>
       </div>
 
-      {/* Interactive Threat Popup Modal */}
+      {/* Modal: Agent Identified High-Risk Area Inspection */}
+      {selectedRiskArea && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#050b14] border border-blue-500/70 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div className="flex items-start justify-between pb-3 border-b border-blue-900/50">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`p-2 rounded-xl border ${
+                    selectedRiskArea.severity === 'red'
+                      ? 'bg-red-950 border-red-700 text-red-400'
+                      : selectedRiskArea.severity === 'yellow'
+                      ? 'bg-amber-950 border-amber-700 text-amber-400'
+                      : 'bg-blue-950 border-blue-700 text-blue-400'
+                  }`}
+                >
+                  <Radar className="w-5 h-5 animate-spin" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base text-white">
+                    {selectedRiskArea.name}
+                  </h4>
+                  <div className="flex items-center gap-2 text-xs font-mono text-gray-400 mt-0.5">
+                    <span className="text-cyan-400 font-bold">[{selectedRiskArea.agentName}]</span>
+                    <span>•</span>
+                    <span>{selectedRiskArea.category}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedRiskArea(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800/60"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {/* Risk Level & D3 Geodesic Radius */}
+              <div className="p-3 rounded-2xl bg-black border border-blue-900/40 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-[11px]">D3 Isı Haritası Risk Skoru:</span>
+                  <span
+                    className={`font-mono text-sm font-extrabold px-2 py-0.5 rounded border ${
+                      selectedRiskArea.severity === 'red'
+                        ? 'bg-red-950 text-red-300 border-red-700'
+                        : selectedRiskArea.severity === 'yellow'
+                        ? 'bg-amber-950 text-amber-300 border-amber-700'
+                        : 'bg-blue-950 text-blue-300 border-blue-700'
+                    }`}
+                  >
+                    %{selectedRiskArea.baseRiskScore} / 100 RİSK DÜZEYİ
+                  </span>
+                </div>
+                <div className="w-full h-2 rounded-full overflow-hidden bg-gradient-to-r from-[#1e3a8a] via-[#f59e0b] to-[#ef4444] border border-blue-800/50" />
+                <div className="flex justify-between text-[9px] text-gray-500 font-mono">
+                  <span>D3 Jeodezik Yarıçap: {selectedRiskArea.radiusDeg}°</span>
+                  <span>Trafik: {selectedRiskArea.livePacketCount}</span>
+                </div>
+              </div>
+
+              {/* Threat Details */}
+              <div className="p-3 rounded-2xl bg-black border border-blue-900/40 space-y-2">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Tehdit Vektörü:</span>
+                  <span className="text-amber-300 font-semibold">{selectedRiskArea.threatVector}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Hedef Kritik Varlık:</span>
+                  <span className="text-emerald-300 font-mono font-medium">{selectedRiskArea.targetAsset}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Ajan Analiz Notu:</span>
+                  <p className="text-gray-300 text-[11px] leading-relaxed">{selectedRiskArea.details}</p>
+                </div>
+              </div>
+
+              {/* Recommended Macro Action */}
+              <div className="p-3 rounded-2xl bg-blue-950/40 border border-blue-800/60 flex items-center justify-between">
+                <div>
+                  <span className="text-blue-400 block text-[10px] font-bold uppercase">Önerilen Savunma Makrosu:</span>
+                  <span className="text-white font-mono font-bold text-xs">{selectedRiskArea.recommendedMacro}</span>
+                  <span className="text-[10px] font-mono text-cyan-300 block">{selectedRiskArea.macroCodeName}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    // Trigger macro via agentManager or alert system
+                    const targetMacro = DEFENSE_MACROS.find((m) => m.codeName === selectedRiskArea.macroCodeName);
+                    if (targetMacro) {
+                      // Trigger audio/speech or log
+                      onAskAssistant(`Savunma Makrosunu Uygula: ${targetMacro.name} (${targetMacro.codeName})`);
+                    }
+                    setSelectedRiskArea(null);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs shadow-md transition"
+                >
+                  Makroyu Ateşle
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-2.5">
+              <button
+                onClick={() => {
+                  focusOnCoordinates(selectedRiskArea.coords);
+                  setSelectedRiskArea(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-blue-950/80 hover:bg-blue-900 text-blue-200 border border-blue-700/60 font-bold text-xs transition text-center"
+              >
+                Küreye Odakla
+              </button>
+              <button
+                onClick={() => {
+                  const q = `${selectedRiskArea.name} üzerindeki ${selectedRiskArea.threatVector} tehdidi için ${selectedRiskArea.agentName} tarafından önerilen "${selectedRiskArea.recommendedMacro}" protokolünün ayrıntıları ve izolasyon planı nedir?`;
+                  setSelectedRiskArea(null);
+                  onAskAssistant(q);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition text-center shadow-lg"
+              >
+                Asistana Analiz Sor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Threat Modal */}
       {selectedThreat && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#050b14] border border-blue-500/60 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-start justify-between pb-3 border-b border-blue-900/40">
               <div className="flex items-center gap-2">
@@ -822,7 +1678,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
 
       {/* Interactive Tactical Heatmap Cluster Modal */}
       {selectedCluster && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#050b14] border border-blue-500/60 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-start justify-between pb-3 border-b border-blue-900/40">
               <div className="flex items-center gap-2">
@@ -838,7 +1694,6 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Thermal Gradient Bar for this cluster */}
               <div className="p-3 rounded-xl bg-black border border-blue-900/40 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-[10px]">Taktiksel Isı Düzeyi:</span>
@@ -846,8 +1701,8 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
                 </div>
                 <div className="w-full h-2 rounded-full overflow-hidden bg-gradient-to-r from-[#1e3a8a] via-[#f59e0b] to-[#ef4444] border border-blue-800/50" />
                 <div className="flex justify-between text-[9px] text-gray-500">
-                  <span>Parlament Mavisi (0%)</span>
-                  <span>Tehlike Kırmızısı (100%)</span>
+                  <span>Düşük Risk (0%)</span>
+                  <span>Kritik Tehdit (100%)</span>
                 </div>
               </div>
 
@@ -877,8 +1732,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({ onAskAssistant, isLo
             <div className="pt-2 flex gap-3">
               <button
                 onClick={() => {
-                  rotationRef.current[0] = -selectedCluster.coords[0];
-                  rotationRef.current[1] = -selectedCluster.coords[1];
+                  focusOnCoordinates(selectedCluster.coords);
                   setSelectedCluster(null);
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-500/50 font-bold text-xs transition text-center"

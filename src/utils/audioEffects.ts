@@ -1,3 +1,5 @@
+import { getGlobalMute } from './ultraTTS';
+
 // Tactical Cyber Web Audio SFX Generator (Zero external assets needed)
 
 let audioCtx: AudioContext | null = null;
@@ -16,8 +18,22 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
-export const playTacticalSound = (type: 'mic_on' | 'mic_off' | 'command_exec' | 'emergency' | 'click' | 'ai_response') => {
+type SoundType = 'mic_on' | 'mic_off' | 'command_exec' | 'emergency' | 'click' | 'ai_response';
+type SoundListener = (type: SoundType) => void;
+const soundListeners: SoundListener[] = [];
+
+export const onSoundPlay = (cb: SoundListener) => {
+  soundListeners.push(cb);
+  return () => {
+    const idx = soundListeners.indexOf(cb);
+    if (idx !== -1) soundListeners.splice(idx, 1);
+  };
+};
+
+export const playTacticalSound = (type: SoundType) => {
   try {
+    soundListeners.forEach(cb => cb(type));
+    if (getGlobalMute()) return;
     const ctx = getAudioContext();
     if (!ctx) return;
 
