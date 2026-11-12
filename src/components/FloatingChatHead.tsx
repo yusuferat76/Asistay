@@ -224,9 +224,12 @@ export const FloatingChatHead: React.FC<FloatingChatHeadProps> = ({
 
   const handleMainClick = (e: React.MouseEvent) => {
     if (!isDragging && !showRadialMenu) {
-      playTacticalSound('click');
-      triggerHaptic('click');
-      onToggleListening();
+      playTacticalSound('command_exec');
+      triggerHaptic('success');
+      // Simulated: Activate Camera, Mute Mic, Start Screen Share
+      setAuditStatus('AI Vision & Ekran Paylaşımı Aktif (Mikrofon Mute)');
+      setTimeout(() => setAuditStatus(null), 3000);
+      onToggleListening(); // Keep existing toggle logic but enhance it
     }
   };
 
@@ -235,18 +238,6 @@ export const FloatingChatHead: React.FC<FloatingChatHeadProps> = ({
     triggerHaptic('success');
     setAuditStatus(`[MAKRO AKTİF] ${macroName}: ${message}`);
     setTimeout(() => setAuditStatus(null), 3500);
-    setShowRadialMenu(false);
-  };
-
-  const handleDirectModelDownload = () => {
-    playTacticalSound('command_exec');
-    triggerHaptic('success');
-    setAuditStatus('Qwen3 27B Uncensored (Hugging Face) İndiriliyor...');
-    setTimeout(() => {
-      setAuditStatus('Qwen3 27B Yerel Cihazda Aktif (%100 Sansürsüz)');
-      speakUltraRealistic('Qwen3 27B Uncensored modeli cihaza başarıyla kuruldu ve çevrimdışı kullanıma hazır.');
-      setTimeout(() => setAuditStatus(null), 4000);
-    }, 3000);
     setShowRadialMenu(false);
   };
 
@@ -291,16 +282,16 @@ export const FloatingChatHead: React.FC<FloatingChatHeadProps> = ({
                 <ShieldAlert className="w-5 h-5 group-hover:scale-110 transition" />
               </motion.button>
 
-              {/* 2. Direct Model Download / Hugging Face Qwen3 (Left) */}
+              {/* 2. Rotate VPN / Tor Hop (Left) */}
               <motion.button
                 initial={{ scale: 0, x: 0 }}
                 animate={{ scale: 1, x: -70 }}
                 exit={{ scale: 0, x: 0 }}
-                onClick={handleDirectModelDownload}
+                onClick={() => executeDefenseMacro('Rotate VPN', 'Ağ tüneli döndürüldü, yeni anonim düğüme geçildi.')}
                 className="absolute w-12 h-12 rounded-full bg-black border-2 border-cyan-400 text-cyan-300 hover:bg-cyan-950 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.6)] transition group"
-                title="Qwen3 27B Uncensored Modelini İndir"
+                title="Rotate VPN / Tor Hop (ONION_CIRCUIT_HOP)"
               >
-                <Download className="w-5 h-5 group-hover:scale-110 transition animate-bounce" />
+                <Radio className="w-5 h-5 group-hover:scale-110 transition" />
               </motion.button>
 
               {/* 3. Encrypt Buffer (Right) */}
@@ -420,39 +411,8 @@ export const FloatingChatHead: React.FC<FloatingChatHeadProps> = ({
           }`}
           title={`Aktif Mod: ${llmExecutionMode.toUpperCase()} • Anlık Gecikme: ${latestLatency}ms`}
         >
-          {/* Quantum-Shield Encryption Integrity Node (Top-Left) */}
-          <div className="absolute -top-3 -left-2 px-1.5 py-0.5 rounded-full text-[8px] font-mono font-extrabold bg-black border border-emerald-500 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.8)] z-20 flex items-center gap-1 animate-pulse"
-               title={`Quantum-Shield: Aktif Şifreleme Akış Bütünlüğü: %${quantumIntegrity}`}>
-            <Shield className="w-2.5 h-2.5 text-emerald-400" />
-            <span>{quantumIntegrity}%</span>
-          </div>
-
-          {/* Mode Badge & Real-time Latency Readout */}
-          <div className="absolute -top-3 right-0 px-2 py-0.5 rounded-full text-[9px] font-mono font-extrabold uppercase text-black shadow-lg z-20 flex items-center gap-1"
-               style={{ backgroundColor: accentColor }}>
-            <span>{llmExecutionMode}</span>
-            <span>{latestLatency}ms</span>
-          </div>
-
+          {/* Main Visualizer Body */}
           <div className="relative w-full h-full rounded-full flex items-center justify-center overflow-hidden">
-            {/* Real-time mini latency sparkline graph inside bottom border */}
-            <div className="absolute bottom-1 left-2 right-2 h-3 flex items-end gap-0.5 pointer-events-none opacity-80">
-              {latencyHistory.map((val, idx) => {
-                const maxVal = 150;
-                const heightPct = Math.min(100, Math.max(15, (val / maxVal) * 100));
-                return (
-                  <div
-                    key={idx}
-                    className="flex-1 rounded-t-sm transition-all duration-300"
-                    style={{
-                      height: `${heightPct}%`,
-                      backgroundColor: accentColor,
-                    }}
-                  />
-                );
-              })}
-            </div>
-
             <div className={`transition-all duration-300 pb-1 ${botState === 'listening' ? 'text-white' : llmExecutionMode === 'local' ? 'text-[#06b6d4]' : 'text-[#FFAA00]'}`}>
               <BotFaceWithPupils state={botState} mode={llmExecutionMode} />
             </div>
@@ -467,63 +427,25 @@ const BotFaceWithPupils: React.FC<{ state: 'idle' | 'listening' | 'processing'; 
   const pupilColor = mode === 'local' ? '#06b6d4' : '#FFAA00';
 
   return (
-    <svg width="40" height="28" viewBox="0 0 40 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Eyebrows */}
-      <motion.path
-        d="M8 7C10 5 14 5 16 7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <motion.path
-        d="M24 7C26 5 30 5 32 7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+    <svg width="40" height="30" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Defined Face Structure */}
+      <path d="M4 15C4 21.6 9.4 27 16 27H24C30.6 27 36 21.6 36 15V13C36 6.4 30.6 1 24 1H16C9.4 1 4 6.4 4 13V15Z" fill="#111" stroke="currentColor" strokeWidth="1.5" />
+      
+      {/* Eyes */}
+      <circle cx="14" cy="14" r="5" fill="#000" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="26" cy="14" r="5" fill="#000" stroke="currentColor" strokeWidth="1.5" />
+      
+      {/* Pupils */}
+      <motion.circle cx="14" cy="14" r="2" fill={pupilColor} animate={{ cx: state === 'listening' ? 15 : 14 }} />
+      <motion.circle cx="26" cy="14" r="2" fill={pupilColor} animate={{ cx: state === 'listening' ? 27 : 26 }} />
 
-      {/* Left Eye Socket */}
-      <motion.ellipse
-        cx="12"
-        cy="16"
-        rx="4.5"
-        ry="4.5"
-        fill="#000000"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <motion.circle
-        cx="12"
-        cy="16"
-        r="1.8"
-        fill={pupilColor}
-        animate={{
-          cx: state === 'listening' ? [12, 13.5, 10.5, 12] : [12, 12.5, 11.5, 12],
-          cy: state === 'listening' ? [16, 14.5, 17.5, 16] : 16,
-        }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-      />
-
-      {/* Right Eye Socket */}
-      <motion.ellipse
-        cx="28"
-        cy="16"
-        rx="4.5"
-        ry="4.5"
-        fill="#000000"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <motion.circle
-        cx="28"
-        cy="16"
-        r="1.8"
-        fill={pupilColor}
-        animate={{
-          cx: state === 'listening' ? [28, 29.5, 26.5, 28] : [28, 28.5, 27.5, 28],
-          cy: state === 'listening' ? [16, 14.5, 17.5, 16] : 16,
-        }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      {/* Mouth */}
+      <motion.path 
+        d={state === 'listening' ? "M15 22C18 24 22 24 25 22" : "M16 21H24"}
+        stroke={pupilColor} 
+        strokeWidth="2" 
+        strokeLinecap="round"
+        animate={{ d: state === 'listening' ? "M15 23C18 25 22 25 25 23" : "M16 21H24" }}
       />
     </svg>
   );
