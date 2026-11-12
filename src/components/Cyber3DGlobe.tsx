@@ -448,6 +448,7 @@ interface Cyber3DGlobeProps {
   isLowBattery?: boolean;
   alerts?: GlobeAlert[];
   agentsTelemetry?: AgentTelemetry[];
+  minimalHomeView?: boolean;
 }
 
 export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
@@ -455,6 +456,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
   isLowBattery = false,
   alerts = [],
   agentsTelemetry = [],
+  minimalHomeView = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedThreat, setSelectedThreat] = useState<CyberThreatPoint | null>(null);
@@ -946,6 +948,53 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
         }
       });
 
+      // 6. Draw Glowing Orbital Satellite Trajectories (as shown in Asistay design)
+      const cx = width / 2;
+      const cy = height / 2;
+      const globeR = projection.scale();
+
+      const orbits = [
+        { rx: globeR * 1.48, ry: globeR * 0.45, rot: -0.42, speed: 0.0007, satColor: '#38bdf8' },
+        { rx: globeR * 1.55, ry: globeR * 0.52, rot: 0.55, speed: -0.0010, satColor: '#60a5fa' },
+        { rx: globeR * 1.38, ry: globeR * 0.38, rot: 0.15, speed: 0.0013, satColor: '#93c5fd' },
+      ];
+
+      orbits.forEach((orb) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(orb.rot);
+
+        // Orbit path
+        ctx.beginPath();
+        ctx.ellipse(0, 0, orb.rx, orb.ry, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+
+        // Orbiting Satellite dot
+        const satAngle = (time * orb.speed) % (Math.PI * 2);
+        const satX = Math.cos(satAngle) * orb.rx;
+        const satY = Math.sin(satAngle) * orb.ry;
+
+        // Satellite outer glow
+        const sGrad = ctx.createRadialGradient(satX, satY, 0, satX, satY, 6);
+        sGrad.addColorStop(0, '#ffffff');
+        sGrad.addColorStop(0.4, orb.satColor);
+        sGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        ctx.fillStyle = sGrad;
+        ctx.beginPath();
+        ctx.arc(satX, satY, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Satellite core
+        ctx.beginPath();
+        ctx.arc(satX, satY, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        ctx.restore();
+      });
+
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -1030,6 +1079,20 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
     rotationRef.current[0] = -coords[0];
     rotationRef.current[1] = -coords[1];
   };
+
+  if (minimalHomeView) {
+    return (
+      <div className="relative flex items-center justify-center w-full select-none py-1">
+        <canvas
+          ref={canvasRef}
+          width={420}
+          height={340}
+          onMouseDown={handleMouseDown}
+          className="cursor-grab active:cursor-grabbing max-w-full drop-shadow-[0_0_35px_rgba(37,99,235,0.25)]"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#050b14] border border-blue-900/60 rounded-3xl p-5 mb-6 shadow-2xl relative overflow-hidden">

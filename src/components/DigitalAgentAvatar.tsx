@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 export const DigitalAgentAvatar: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [micAccess, setMicAccess] = useState(true);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -52,10 +51,8 @@ export const DigitalAgentAvatar: React.FC = () => {
         analyser.fftSize = 256;
         source.connect(analyser);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
-        setMicAccess(true);
       } catch (err) {
-        console.warn("Audio analysis blocked:", err);
-        setMicAccess(false);
+        console.error("Audio analysis failed:", err);
       }
     };
     initAudio();
@@ -64,19 +61,17 @@ export const DigitalAgentAvatar: React.FC = () => {
     const animate = () => {
       requestAnimationFrame(animate);
 
-      if (micAccess && analyser && dataArray) {
-        analyser.getByteFrequencyData(dataArray);
+      if (analyser && dataArray) {
+        analyser.getByteFrequencyData(dataArray as any);
         const lowFreq = dataArray.slice(0, 10).reduce((a, b) => a + b) / 10;
         const midFreq = dataArray.slice(10, 50).reduce((a, b) => a + b) / 40;
         
         // Deform mouth based on voice
         mouth.scale.set(1, 1 + lowFreq / 100, 1);
         head.scale.set(1 + midFreq / 500, 1 + midFreq / 500, 1 + midFreq / 500);
-      } else {
-        // Idle animation when mic is not active
-        head.rotation.y += 0.005;
       }
 
+      head.rotation.y += 0.005;
       renderer.render(scene, camera);
     };
     animate();
@@ -87,7 +82,7 @@ export const DigitalAgentAvatar: React.FC = () => {
       }
       renderer.dispose();
     };
-  }, [micAccess]);
+  }, []);
 
   return <div ref={mountRef} className="w-24 h-24 rounded-full overflow-hidden" />;
 };
