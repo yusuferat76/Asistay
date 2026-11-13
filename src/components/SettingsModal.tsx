@@ -225,27 +225,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* API Key Definition */}
+              {/* Server-Side Secure Proxy & Local Gateway Status */}
               <div className="space-y-3">
                 <h4 className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
                   <Key className="w-4 h-4" />
-                  <span>API Anahtarı Tanımlama (Secure Proxy)</span>
+                  <span>Sunucu Taraflı Güvenli AI Proxy & Yerel Çekirdek</span>
                 </h4>
                 <div className="p-4 rounded-2xl bg-[#080808] border border-blue-950 space-y-2">
-                  <div className="text-xs text-gray-300">Gemini & Kimi K3 Cloud Gateway Secret Token:</div>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      className="flex-1 px-3 py-2 bg-black border border-blue-900/60 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-cyan-400"
-                    />
-                    <button
-                      onClick={() => { playTacticalSound('command_exec'); alert('API Anahtarı başarıyla güvenli tünelde saklandı.'); }}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition"
-                    >
-                      Doğrula
-                    </button>
+                  <div className="flex items-center justify-between text-xs text-gray-300">
+                    <span>Gemini 4 Hydrogen Sunucu Köprüsü (/api/cyber/*)</span>
+                    <span className="font-mono text-emerald-400 font-bold">MÜHÜRLÜ & AKTİF</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span>Yerel Ollama Omurgası (localhost:11434)</span>
+                    <span className="font-mono text-cyan-300">Yedek Çekirdek Hazır</span>
                   </div>
                 </div>
               </div>

@@ -1,0 +1,60 @@
+name: Asistay WebDev Android APK Build
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Dependencies & Build WebApp
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate Android Keystore (Debug/Release Ready)
+        run: |
+          keytool -genkeypair -v -keystore android.keystore -alias asistay -keyalg RSA -keysize 2048 -validity 10000 -storepass asistay2026 -keypass asistay2026 -dname "CN=Asistay, OU=Security, O=Asistay, L=Istanbul, S=TR, C=TR"
+
+      - name: Build Installable APK via Bubblewrap TWA
+        run: |
+          npm install -g @bubblewrap/cli
+          bubblewrap update --manifest twa-manifest.json || true
+          echo -e "asistay2026\nasistay2026" | bubblewrap build --skipPwaValidation
+
+      - name: Upload Installable Asistay APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Asistay-Android-APK
+          path: app-release-signed.apk
+
+      - name: Publish APK to GitHub Releases (Auto-Update Ready)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.6.${{ github.run_number }}
+          name: Asistay Android APK v2.6.${{ github.run_number }}
+          files: app-release-signed.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

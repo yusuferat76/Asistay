@@ -3,28 +3,19 @@ import {
   Send,
   Sparkles,
   Bot,
-  User,
-  Shield,
   X,
-  Mic,
-  MicOff,
-  Terminal,
   Activity,
-  Cpu,
-  CheckCircle,
-  HelpCircle,
-  Zap,
 } from 'lucide-react';
 import { playTacticalSound } from '../utils/audioEffects';
 import { triggerHaptic } from '../utils/haptics';
 import { speakUltraRealistic } from '../utils/ultraTTS';
-
-interface Message {
-  id: string;
-  sender: 'user' | 'assistant';
-  text: string;
-  timestamp: string;
-}
+import {
+  loadChatMessages,
+  saveChatMessages,
+  loadChatDraft,
+  saveChatDraft,
+  PersistedChatMessage,
+} from '../utils/asistayStorage';
 
 interface AsistayChatModalProps {
   isOpen: boolean;
@@ -32,22 +23,36 @@ interface AsistayChatModalProps {
   onAskAI?: (prompt: string) => void;
 }
 
+const DEFAULT_WELCOME_MESSAGES: PersistedChatMessage[] = [
+  {
+    id: 'welcome',
+    sender: 'assistant',
+    text: 'Merhaba! Ben Asistay Siber Güvenlik Asistanınız. Sohbet geçmişiniz cihazda saklanır; sistemleriniz, ağ bağlantılarınız ve dijital güvenliğiniz hakkında her şeyi sorabilirsiniz.',
+    timestamp: 'Şimdi',
+    source: 'system',
+  },
+];
+
 export const AsistayChatModal: React.FC<AsistayChatModalProps> = ({
   isOpen,
   onClose,
   onAskAI,
 }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      sender: 'assistant',
-      text: 'Merhaba! Ben Asistay Siber Güvenlik Asistanınız. Sistemleriniz, ağ bağlantılarınız ve dijital güvenliğiniz hakkında sormak istediğiniz her şeyi yanıtlayabilirim.',
-      timestamp: 'Şimdi',
-    },
-  ]);
-  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<PersistedChatMessage[]>(() =>
+    loadChatMessages(DEFAULT_WELCOME_MESSAGES)
+  );
+  const [inputText, setInputText] = useState<string>(() => loadChatDraft());
   const [isTyping, setIsTyping] = useState(false);
+  const [engineBadge, setEngineBadge] = useState<string>('ÇEVRİMİÇİ');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    saveChatMessages(messages);
+  }, [messages]);
+
+  useEffect(() => {
+    saveChatDraft(inputText);
+  }, [inputText]);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,52 +62,78 @@ export const AsistayChatModal: React.FC<AsistayChatModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSend = (textToSend?: string) => {
-    const text = textToSend || inputText;
-    if (!text.trim()) return;
+  const handleSend = async (textToSend?: string) => {
+    const rawText = textToSend ?? inputText;
+    const text = rawText.trim();
+    if (!text || isTyping) return;
 
     playTacticalSound('command_exec');
     triggerHaptic('click');
 
-    const userMsg: Message = {
+    const userMsg: PersistedChatMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
-      text: text.trim(),
+      text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
+    const nextHistory = [...messages, userMsg];
+    setMessages(nextHistory);
+    if (!textToSend) {
+      setInputText('');
+      saveChatDraft('');
+    }
     setIsTyping(true);
+    if (onAskAI) onAskAI(text);
 
-    setTimeout(() => {
-      let reply = 'Talebiniz analiz edildi. ';
-      const lower = text.toLowerCase();
+    try {
+      const resp = await fetch('/api/cyber/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: nextHistory.slice(-8),
+        }),
+      });
 
-      if (lower.includes('şifre') || lower.includes('parola') || lower.includes('kırıcı')) {
-        reply = 'Şifre kırıcı ve entropi analiz modülü devrede. Donanımsal bellek katmanında ML-KEM-1024 kuantum dayanıklı şifreleme aktif edildi. Zayıf şifreler tespit edilip karantinaya alınır.';
-      } else if (lower.includes('ağ') || lower.includes('wifi') || lower.includes('paket')) {
-        reply = 'Sentinel-X Derin Paket İncelemesi (DPI) arka planda 8.4M pps debiyle çalışıyor. DNS tünelleme ve yetkisiz ARP yayınları anında bloke ediliyor.';
-      } else if (lower.includes('kamera') || lower.includes('gör') || lower.includes('ekran')) {
-        reply = 'Optik Yapay Zeka Görüşü ve Canlı Ekran Paylaşımı başlatılabilir. Mikrofon ses girişi gizliliğiniz için otomatik mühürlenir.';
-      } else if (lower.includes('apk') || lower.includes('indir') || lower.includes('kur')) {
-        reply = 'Asistay Android APK kurulum paketi ve WebAPK manifest hazır. Üst kısımdaki "APK İndir" butonuna tıklayarak doğrudan indirebilirsiniz.';
+      const data = await resp.json().catch(() => null);
+      const reply =
+        data?.reply ||
+        'Yerel motor bağlantısı kurulamadı; mesajınız cihaz belleğinde güvenle saklandı.';
+      const source = String(data?.source || 'local-heuristic-engine');
+
+      if (source === 'gemini-4-hydrogen') {
+        setEngineBadge('GEMINI 4');
+      } else if (source === 'ollama-local') {
+        setEngineBadge('OLLAMA YEREL');
       } else {
-        reply = `Komut onaylandı: "${text}". Tüm güvenlik ajanları (Sentinel-X, Guardian-V, Ghost-S) ve kuantum kalkanları nominal frekansta devrede.`;
+        setEngineBadge('YEREL MOTOR');
       }
 
-      const botMsg: Message = {
+      const botMsg: PersistedChatMessage = {
         id: `bot-${Date.now()}`,
         sender: 'assistant',
         text: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        source,
       };
 
       setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
       speakUltraRealistic(reply);
       playTacticalSound('ai_response');
-    }, 900);
+    } catch {
+      setEngineBadge('ÇEVRİMDIŞI');
+      const offlineMsg: PersistedChatMessage = {
+        id: `bot-${Date.now()}`,
+        sender: 'assistant',
+        text: 'Sunucu model uç noktasına ulaşılamadı. Mesajınız cihaz içi yerel geçmişte korundu; internet veya sunucu bağlantısı sağlandığında yeniden deneyebilirsiniz.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        source: 'offline-honest',
+      };
+      setMessages((prev) => [...prev, offlineMsg]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const quickPrompts = [
@@ -124,11 +155,11 @@ export const AsistayChatModal: React.FC<AsistayChatModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white text-base">Asistay Siber Asistan</h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800">
-                  ÇEVRİMİÇİ
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-950/80 text-cyan-300 border border-cyan-700/60">
+                  {engineBadge}
                 </span>
               </div>
-              <p className="text-xs text-blue-300/80">Sor, öğren, planla & komut ver</p>
+              <p className="text-xs text-blue-300/80">Sor, öğren, planla &amp; yerel geçmiş</p>
             </div>
           </div>
           <button
@@ -156,10 +187,12 @@ export const AsistayChatModal: React.FC<AsistayChatModalProps> = ({
                 {m.sender === 'assistant' && (
                   <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400 mb-1 font-bold">
                     <Sparkles className="w-3 h-3" />
-                    <span>ASİSTAY ZEKA MOTORU</span>
+                    <span>
+                      ASİSTAY ZEKA MOTORU{m.source ? ` • ${m.source.toUpperCase()}` : ''}
+                    </span>
                   </div>
                 )}
-                <p>{m.text}</p>
+                <p className="whitespace-pre-line">{m.text}</p>
                 <span className="block text-[10px] text-gray-400/80 mt-1 text-right font-mono">
                   {m.timestamp}
                 </span>

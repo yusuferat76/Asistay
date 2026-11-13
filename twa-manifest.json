@@ -1,0 +1,40 @@
+{
+  "packageId": "com.asistay.security.app",
+  "host": "ais-pre-weqfmdneapgf2ft4yovpvp-179102912750.europe-west2.run.app",
+  "name": "Asistay",
+  "launcherName": "Asistay",
+  "display": "standalone",
+  "themeColor": "#000000",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#000000",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-pre-weqfmdneapgf2ft4yovpvp-179102912750.europe-west2.run.app/pwa-512x512.png",
+  "maskableIconUrl": "https://ais-pre-weqfmdneapgf2ft4yovpvp-179102912750.europe-west2.run.app/pwa-maskable-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "asistay"
+  },
+  "appVersionCode": 260,
+  "appVersionName": "2.6.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-pre-weqfmdneapgf2ft4yovpvp-179102912750.europe-west2.run.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "orientation": "portrait"
+}

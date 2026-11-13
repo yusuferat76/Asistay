@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Shield,
   Zap,
@@ -26,9 +26,12 @@ import {
   Crosshair,
   WifiOff,
   EyeOff,
+  Network,
 } from 'lucide-react';
 import { playTacticalSound } from '../utils/audioEffects';
 import { speakUltraRealistic } from '../utils/ultraTTS';
+import { agentManager, AgentTelemetry } from '../utils/AgentManager';
+import { LiveVectorMonitor3D } from './LiveVectorMonitor3D';
 
 export interface TacticalToolItem {
   id: string;
@@ -478,6 +481,13 @@ export const TacticalInventoryHub: React.FC<TacticalInventoryHubProps> = ({ onAs
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [inspectingTool, setInspectingTool] = useState<TacticalToolItem | null>(null);
+  const [showLive3D, setShowLive3D] = useState<boolean>(true);
+  const [telemetry, setTelemetry] = useState<AgentTelemetry[]>(() => agentManager.getAgents());
+
+  useEffect(() => {
+    const unsub = agentManager.onTelemetry((data) => setTelemetry(data));
+    return () => unsub();
+  }, []);
 
   const categories = [
     { id: 'all', label: 'Tüm Araçlar (28)', icon: Sliders },
@@ -560,7 +570,7 @@ export const TacticalInventoryHub: React.FC<TacticalInventoryHubProps> = ({ onAs
         </div>
 
         {/* Global Action Stats & Toggles */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-black border border-blue-900/50 text-[11px] font-mono">
             <span className="text-gray-400">
               Aktif: <strong className="text-emerald-400">{activeCount}/28</strong>
@@ -570,6 +580,21 @@ export const TacticalInventoryHub: React.FC<TacticalInventoryHubProps> = ({ onAs
               Engellenen: <strong className="text-blue-300">{totalEvents.toLocaleString()}</strong>
             </span>
           </div>
+
+          <button
+            onClick={() => {
+              playTacticalSound('click');
+              setShowLive3D((v) => !v);
+            }}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 border ${
+              showLive3D
+                ? 'bg-cyan-600/25 border-cyan-400/70 text-cyan-200 hover:bg-cyan-600/40'
+                : 'bg-black border-blue-900/60 text-gray-300 hover:text-white'
+            }`}
+          >
+            <Network className="w-3.5 h-3.5 text-cyan-400" />
+            <span>{showLive3D ? '3D Canlı İzleme: Açık' : '3D Canlı İzleme: Kapalı'}</span>
+          </button>
 
           <button
             onClick={() => handleToggleAll(true)}
@@ -652,8 +677,16 @@ export const TacticalInventoryHub: React.FC<TacticalInventoryHubProps> = ({ onAs
         })}
       </div>
 
-      {/* 28 Tool Cards Grid */}
-      <div className="flex-1 overflow-y-auto pr-1">
+      {/* 3D Canlı İzleme + 28 Tool Cards Grid */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+        {showLive3D && (
+          <LiveVectorMonitor3D
+            agentsTelemetry={telemetry}
+            onAskAssistant={onAskAssistant}
+            compact={true}
+          />
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 pb-6">
           {filteredTools.map((tool) => {
             const isCrit = tool.severity === 'Critical';

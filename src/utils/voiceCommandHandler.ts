@@ -15,16 +15,168 @@ export interface VoiceCommandResult {
     | 'SCROLL_BOTTOM'
     | 'CLOSE_MODAL'
     | 'LIGHTSPEED_MODE'
-    | 'DEBT_SUMMARY';
+    | 'DEBT_SUMMARY'
+    | 'OPEN_SECURITY_RADAR'
+    | 'RUN_CIPHER_BREAKER'
+    | 'ENABLE_STEALTH_MODE'
+    | 'DISABLE_STEALTH_MODE'
+    | 'OPEN_VISION'
+    | 'TOGGLE_SCREEN_SHARE'
+    | 'OPEN_CHAT'
+    | 'OPEN_ADMIN_CENTER';
   target?: string;
   feedbackText?: string;
+  matchedKeyword?: string;
 }
 
 /**
- * Recognizes and parses direct spoken Turkish commands in <1ms (saliselik / light-speed)
+ * Recognizes and parses direct spoken English & Turkish commands in <1ms
  */
 export function parseTurkishVoiceCommand(transcript: string): VoiceCommandResult {
   const text = transcript.toLowerCase().trim();
+
+  // Direct App Action Mappings (EN + TR)
+  if (
+    text.includes('open security radar') ||
+    text.includes('security radar') ||
+    text.includes('open live monitor') ||
+    text.includes('live monitor') ||
+    text.includes('canlı izleme') ||
+    text.includes('canlı izlemeyi aç') ||
+    text.includes('güvenlik radarını aç') ||
+    text.includes('güvenlik radarı') ||
+    text.includes('radarı aç') ||
+    text.includes('tehdit radarı')
+  ) {
+    return {
+      isCommand: true,
+      action: 'OPEN_SECURITY_RADAR',
+      target: 'guvenlik',
+      matchedKeyword: 'Open Security Radar / Live Monitor',
+      feedbackText: '3D Siber Tehdit Radarı ve Vektör Canlı İzleme katmanı açılıyor.',
+    };
+  }
+
+  if (
+    text.includes('run cipher breaker') ||
+    text.includes('cipher breaker') ||
+    text.includes('şifre kırıcıyı çalıştır') ||
+    text.includes('şifre kırıcı') ||
+    text.includes('şifre analizi') ||
+    text.includes('entropi testi')
+  ) {
+    return {
+      isCommand: true,
+      action: 'RUN_CIPHER_BREAKER',
+      target: 'cipher',
+      matchedKeyword: 'Run Cipher Breaker',
+      feedbackText: 'Canlı Şifre Kırıcı ve ML-KEM-1024 entropi testi çalıştırılıyor.',
+    };
+  }
+
+  if (
+    text.includes('enable stealth mode') ||
+    text.includes('activate stealth mode') ||
+    text.includes('gizli modu aç') ||
+    text.includes('gizli mod') ||
+    text.includes('görünmez mod') ||
+    text.includes('gizlilik modunu aç')
+  ) {
+    return {
+      isCommand: true,
+      action: 'ENABLE_STEALTH_MODE',
+      target: 'stealth',
+      matchedKeyword: 'Enable Stealth Mode',
+      feedbackText: 'Gizli mod (Stealth Mode) aktif edildi. Tüm ağ izleri maskeleniyor.',
+    };
+  }
+
+  if (
+    text.includes('disable stealth mode') ||
+    text.includes('gizli modu kapat') ||
+    text.includes('normal moda dön')
+  ) {
+    return {
+      isCommand: true,
+      action: 'DISABLE_STEALTH_MODE',
+      target: 'normal',
+      matchedKeyword: 'Disable Stealth Mode',
+      feedbackText: 'Gizli mod devre dışı bırakıldı.',
+    };
+  }
+
+  if (
+    text.includes('open chat') ||
+    text.includes('sohbeti aç') ||
+    text.includes('sohbet başlat')
+  ) {
+    return {
+      isCommand: true,
+      action: 'OPEN_CHAT',
+      matchedKeyword: 'Open Chat',
+      feedbackText: 'Asistay sohbet penceresi açılıyor.',
+    };
+  }
+
+  if (
+    text.includes('open camera') ||
+    text.includes('open vision') ||
+    text.includes('kamerayı aç') ||
+    text.includes('görüşü aç')
+  ) {
+    return {
+      isCommand: true,
+      action: 'OPEN_VISION',
+      matchedKeyword: 'Open AI Vision',
+      feedbackText: 'Yapay zeka kamera görüşü açılıyor.',
+    };
+  }
+
+  if (
+    text.includes('share screen') ||
+    text.includes('ekran paylaş') ||
+    text.includes('ekran paylaşımını başlat')
+  ) {
+    return {
+      isCommand: true,
+      action: 'TOGGLE_SCREEN_SHARE',
+      matchedKeyword: 'Share Screen',
+      feedbackText: 'Canlı ekran paylaşımı tetiklendi.',
+    };
+  }
+
+  if (
+    text.includes('command center') ||
+    text.includes('komuta merkezi') ||
+    text.includes('komuta konsolu')
+  ) {
+    return {
+      isCommand: true,
+      action: 'OPEN_ADMIN_CENTER',
+      matchedKeyword: 'Open Command Center',
+      feedbackText: 'Yönetici komuta merkezi açılıyor.',
+    };
+  }
+
+  if (text.includes('open history') || text.includes('geçmişi aç')) {
+    return {
+      isCommand: true,
+      action: 'SWITCH_TAB',
+      target: 'gecmis',
+      matchedKeyword: 'Open History',
+      feedbackText: 'Güvenlik geçmişi açılıyor.',
+    };
+  }
+
+  if (text.includes('open settings') || text.includes('ayarları aç')) {
+    return {
+      isCommand: true,
+      action: 'SWITCH_TAB',
+      target: 'ayarlar',
+      matchedKeyword: 'Open Settings',
+      feedbackText: 'Sistem ayarları açılıyor.',
+    };
+  }
 
   // 0. Işık Hızı / Ultra Hız Kontrolü & Anlık Selamlama
   if (

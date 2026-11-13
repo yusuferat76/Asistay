@@ -948,7 +948,7 @@ export const Cyber3DGlobe: React.FC<Cyber3DGlobeProps> = ({
         }
       });
 
-      // 6. Draw Glowing Orbital Satellite Trajectories (as shown in Asistay design)
+      // 6. Draw Glowing Orbital Satellite Trajectories (as shown in Sınırsız Asistan design)
       const cx = width / 2;
       const cy = height / 2;
       const globeR = projection.scale();
